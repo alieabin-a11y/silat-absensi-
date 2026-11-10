@@ -1,0 +1,29 @@
+# .gitignore — Absensi Silat Putra Setia
+
+# clasp credential & config — JANGAN PERNAH di-commit
+.clasp.json
+.claspignore
+
+# Credential & secret lainnya
+*.env
+.env.*
+secrets.*
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build output (kalau ada)
+dist/
+build/
+
