@@ -1,6 +1,7 @@
 /**
  * app.js — Logika Frontend Pelatih Absensi Silat Putra Setia Rawa Bebek
- * Milestone 2 & 3: Login Pelatih, Sesi Aktif, Scan Kamera QR, Feedback, Cari Manual, Pembayaran Lunas.
+ * Milestone 2 & 3: Login Pelatih, Sesi Aktif, Scan Kamera QR, Feedback, Cari Manual, Pembayaran Lunas,
+ *                  Izin/Sakit Manual, Hapus Kehadiran, Tutup Sesi.
  */
 
 // URL Backend Google Apps Script Web App
@@ -161,6 +162,9 @@ const modalStudentMeta = document.getElementById('modalStudentMeta');
 const modalStatusBadge = document.getElementById('modalStatusBadge');
 const modalActions = document.getElementById('modalActions');
 
+// M3: Tutup Sesi
+const btnCloseSession = document.getElementById('btnCloseSession');
+
 // ─────────────────────────────────────────────
 // Inisialisasi Aplikasi
 // ─────────────────────────────────────────────
@@ -179,6 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
   selectSession.addEventListener('change', handleSessionChange);
   btnToggleCamera.addEventListener('click', toggleCamera);
   inputManualSearch.addEventListener('input', handleManualSearch);
+  if (btnCloseSession) btnCloseSession.addEventListener('click', handleCloseSession);
 });
 
 // ─────────────────────────────────────────────
@@ -845,14 +850,23 @@ function handleManualSearch(e) {
         <strong>${s.nama}</strong> ${s.panggilan ? `(${s.panggilan})` : ''}
         <div style="font-size: 0.8rem; color: var(--text-muted);">${s.idSiswa} • ${s.status}</div>
       </div>
-      <button class="btn btn-primary btn-sm" style="width: auto;">Scan Hadir</button>
+      <button class="btn btn-primary btn-sm" style="width: auto;">Hadir</button>
     `;
-    item.onclick = () => {
+    // Tombol Hadir: langsung proses scan
+    item.querySelector('button').addEventListener('click', (e) => {
+      e.stopPropagation();
       studentSearchResults.style.display = 'none';
       inputManualSearch.value = '';
       pauseScanner();
       processScan(s.idSiswa);
-    };
+    });
+    // Klik baris nama: tampilkan opsi Hadir / Izin / Sakit
+    item.addEventListener('click', (e) => {
+      if (e.target.tagName === 'BUTTON') return;
+      studentSearchResults.style.display = 'none';
+      inputManualSearch.value = '';
+      showAttendanceOptions(s);
+    });
     studentSearchResults.appendChild(item);
   });
 
@@ -887,17 +901,195 @@ function renderAttendanceList() {
     const el = document.createElement('div');
     el.className = 'attendance-item';
     const isPaid = item.statusBayar === 'Lunas';
+    // Badge status hadir (Hadir/Izin/Sakit)
+    const statusHadirLabel = item.statusHadir === 'Izin' ? ' 📝' : item.statusHadir === 'Sakit' ? ' 🤒' : '';
     el.innerHTML = `
-      <div>
-        <div class="attendance-name">${item.nama} (${item.idSiswa})</div>
-        <div class="attendance-time">${item.timestamp}</div>
+      <div style="flex: 1; min-width: 0;">
+        <div class="attendance-name">${item.nama} (${item.idSiswa})${statusHadirLabel}</div>
+        <div class="attendance-time">${item.timestamp || '-'}</div>
       </div>
-      <div>
-        <button class="badge-${isPaid ? 'paid' : 'unpaid'}" style="cursor: pointer; border: none; font-family: inherit;" onclick="promptMarkPaid('${item.idSesi}', '${item.idSiswa}', '${item.nama}', ${isPaid})" title="Klik untuk ubah status bayar">
+      <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
+        <button class="badge-${isPaid ? 'paid' : 'unpaid'}" style="cursor: pointer; border: none; font-family: inherit;" title="Klik untuk ubah status bayar">
           ${item.statusBayar || 'Belum'} ${isPaid ? '✓' : '✎'}
         </button>
+        <button class="btn btn-secondary btn-sm" style="width: auto; padding: 4px 8px; font-size: 0.75rem;" title="Hapus kehadiran">🗑️</button>
       </div>
     `;
+    // Tombol bayar
+    el.querySelector('.badge-' + (isPaid ? 'paid' : 'unpaid')).addEventListener('click', () => {
+      promptMarkPaid(item.idSesi, item.idSiswa, item.nama, isPaid);
+    });
+    // Tombol hapus
+    el.querySelector('button:last-child').addEventListener('click', () => {
+      promptDeleteAttendance(item.idSesi, item.idSiswa, item.nama);
+    });
     attendanceList.appendChild(el);
   });
+}
+
+// ─────────────────────────────────────────────
+// M3: Opsi Kehadiran Manual (Hadir/Izin/Sakit)
+// ─────────────────────────────────────────────
+
+function showAttendanceOptions(siswa) {
+  if (!appData.sesiAktif) {
+    alert('Pilih sesi aktif terlebih dahulu.');
+    return;
+  }
+  openScanModal(
+    '📋',
+    'Catat Kehadiran Manual',
+    `${siswa.nama} ${siswa.panggilan ? '(' + siswa.panggilan + ')' : ''}`,
+    `ID: ${siswa.idSiswa} • Pilih status kehadiran`,
+    `<span class="badge-unpaid">Pilih Status</span>`,
+    [
+      {
+        text: '✅ Hadir (Scan)',
+        class: 'btn-primary',
+        onClick: () => {
+          closeScanModal();
+          pauseScanner();
+          processScan(siswa.idSiswa);
+        }
+      },
+      {
+        text: '📝 Izin',
+        class: 'btn-secondary',
+        onClick: async () => {
+          closeScanModal();
+          await submitSetAttendance(siswa.idSiswa, 'Izin', siswa.nama);
+        }
+      },
+      {
+        text: '🤒 Sakit',
+        class: 'btn-secondary',
+        onClick: async () => {
+          closeScanModal();
+          await submitSetAttendance(siswa.idSiswa, 'Sakit', siswa.nama);
+        }
+      },
+      {
+        text: 'Batal',
+        class: 'btn-secondary',
+        onClick: () => resumeScanner()
+      }
+    ]
+  );
+}
+
+async function submitSetAttendance(idSiswa, statusHadir, namaDisplay) {
+  showFeedback('warning', 'Menyimpan...', `Mencatat ${statusHadir} untuk ${namaDisplay}...`);
+  try {
+    const res = await apiRequest('setAttendance', {
+      idSesi: appData.sesiAktif.idSesi,
+      idSiswa: idSiswa,
+      statusHadir: statusHadir
+    });
+    if (res.ok) {
+      playChime('success');
+      vibrate([150]);
+      // Reload daftar dari server
+      await loadSessionAttendance(appData.sesiAktif.idSesi);
+      showFeedback('success', `${statusHadir} Tercatat`, `${namaDisplay} dicatat ${statusHadir}.`);
+    } else {
+      showFeedback('danger', 'Gagal', res.message || 'Gagal menyimpan status.');
+    }
+  } catch (err) {
+    showFeedback('danger', 'Koneksi Error', 'Gagal menghubungi server.');
+  }
+  resumeScanner();
+}
+
+// ─────────────────────────────────────────────
+// M3: Hapus Kehadiran
+// ─────────────────────────────────────────────
+
+function promptDeleteAttendance(idSesi, idSiswa, nama) {
+  openScanModal(
+    '🗑️',
+    'Hapus Kehadiran?',
+    nama,
+    `ID: ${idSiswa} • Sesi: ${idSesi}`,
+    `<span class="badge-unpaid">Konfirmasi Hapus</span>`,
+    [
+      {
+        text: '🗑️ Ya, Hapus',
+        class: 'btn-danger',
+        onClick: async () => {
+          closeScanModal();
+          await submitDeleteAttendance(idSesi, idSiswa, nama);
+        }
+      },
+      {
+        text: 'Batal',
+        class: 'btn-secondary',
+        onClick: () => closeScanModal()
+      }
+    ]
+  );
+}
+
+async function submitDeleteAttendance(idSesi, idSiswa, namaDisplay) {
+  showFeedback('warning', 'Menghapus...', `Menghapus kehadiran ${namaDisplay}...`);
+  try {
+    const res = await apiRequest('deleteAttendance', { idSesi, idSiswa });
+    if (res.ok) {
+      playChime('success');
+      vibrate([150]);
+      // Hapus dari daftar lokal
+      sessionAttendanceList = sessionAttendanceList.filter(a => a.idSiswa !== idSiswa);
+      renderAttendanceList();
+      showFeedback('success', 'Kehadiran Dihapus', `${namaDisplay} telah dihapus dari sesi ini.`);
+    } else {
+      showFeedback('danger', 'Gagal Hapus', res.message || 'Gagal menghapus.');
+    }
+  } catch (err) {
+    showFeedback('danger', 'Koneksi Error', 'Gagal menghubungi server.');
+  }
+}
+
+// ─────────────────────────────────────────────
+// M3: Tutup Sesi
+// ─────────────────────────────────────────────
+
+async function handleCloseSession() {
+  if (!appData.sesiAktif) {
+    alert('Tidak ada sesi aktif yang bisa ditutup.');
+    return;
+  }
+  const sesi = appData.sesiAktif;
+  if (!confirm(`Tutup sesi "${sesi.idSesi}" dan tandai sebagai Terlaksana?\n\nTotal hadir: ${sessionAttendanceList.length} siswa.`)) {
+    return;
+  }
+  btnCloseSession.disabled = true;
+  btnCloseSession.textContent = '⏳ Menutup sesi...';
+  showFeedback('warning', 'Menutup Sesi...', `Memperbarui status sesi ${sesi.idSesi}...`);
+  try {
+    const res = await apiRequest('updateSession', {
+      idSesi: sesi.idSesi,
+      statusSesi: 'Terlaksana'
+    });
+    if (res.ok) {
+      playChime('success');
+      vibrate([200, 100, 200]);
+      // Update data sesi di local state
+      if (res.data && res.data.sesi) {
+        appData.sesiAktif = res.data.sesi;
+        // Update juga di daftar sesi
+        const idx = appData.sesi.findIndex(s => s.idSesi === sesi.idSesi);
+        if (idx !== -1) appData.sesi[idx] = res.data.sesi;
+        renderSessionInfo();
+      }
+      showFeedback('success', 'Sesi Ditutup! ✓', `Sesi ${sesi.idSesi} sudah ditandai Terlaksana.`);
+      btnCloseSession.textContent = '✓ Sesi Sudah Ditutup';
+    } else {
+      showFeedback('danger', 'Gagal Tutup Sesi', res.message || 'Gagal update status sesi.');
+      btnCloseSession.disabled = false;
+      btnCloseSession.textContent = '🔒 Tutup Sesi (Tandai Terlaksana)';
+    }
+  } catch (err) {
+    showFeedback('danger', 'Koneksi Error', 'Gagal menghubungi server.');
+    btnCloseSession.disabled = false;
+    btnCloseSession.textContent = '🔒 Tutup Sesi (Tandai Terlaksana)';
+  }
 }

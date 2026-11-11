@@ -195,15 +195,151 @@ function handleScan(body, namaPelatih) {
 }
 
 // ─────────────────────────────────────────────
-// Stubs untuk M3 (akan diimplementasikan di M3)
+// M3: setAttendance — Catat Izin / Sakit manual
 // ─────────────────────────────────────────────
 
+/**
+ * Aksi: setAttendance
+ * Params: { idSesi, idSiswa, statusHadir }
+ * statusHadir: 'Izin' | 'Sakit'
+ *
+ * - Jika baris belum ada: buat baris baru (Tarif=0, Status_Bayar='Belum').
+ * - Jika baris sudah ada: update statusHadir, set tarif=0.
+ */
 function setAttendance(body, namaPelatih) {
-  return jsonResponse(false, 'not_implemented', 'setAttendance akan tersedia di M3.', null);
+  var idSesi      = body.idSesi;
+  var idSiswa     = body.idSiswa;
+  var statusHadir = body.statusHadir;
+
+  // Validasi input
+  if (!idSesi || !idSiswa) {
+    return jsonResponse(false, 'invalid_input', 'ID Sesi dan ID Siswa wajib diisi.', null);
+  }
+  if (statusHadir !== 'Izin' && statusHadir !== 'Sakit') {
+    return jsonResponse(false, 'invalid_input', 'statusHadir harus "Izin" atau "Sakit".', null);
+  }
+  idSesi  = idSesi.trim();
+  idSiswa = idSiswa.trim();
+
+  // Validasi format ID Siswa
+  if (!isValidStudentId(idSiswa)) {
+    return jsonResponse(false, 'unknown_student', 'Format ID Siswa tidak valid.', null);
+  }
+
+  // Cek sesi ada
+  var sesi = getSesiById(idSesi);
+  if (!sesi) {
+    return jsonResponse(false, 'not_found', 'Sesi tidak ditemukan.', null);
+  }
+
+  // Cek siswa ada
+  var siswa = getSiswaById(idSiswa);
+  if (!siswa) {
+    return jsonResponse(false, 'unknown_student', 'Siswa tidak ditemukan.', null);
+  }
+
+  var lock = LockService.getScriptLock();
+  var hasLock = false;
+  try {
+    hasLock = lock.tryLock(20000);
+    if (!hasLock) {
+      return jsonResponse(false, 'server_busy', 'Server sibuk, coba lagi.', null);
+    }
+
+    var existing = findAbsensiRow(idSesi, idSiswa);
+    var nowTimestamp = formatTimestampWIB(new Date());
+
+    if (existing.found) {
+      // Update baris yang sudah ada
+      updateAbsensiRow(existing.rowIndex, {
+        statusHadir: statusHadir,
+        tarif: 0,
+        dicatatOleh: namaPelatih
+      });
+      logInfo('setAttendance update: ' + idSiswa + ' -> ' + statusHadir + ' di sesi ' + idSesi);
+    } else {
+      // Buat baris baru
+      var newRecord = {
+        timestamp:     nowTimestamp,
+        idSesi:        idSesi,
+        idSiswa:       idSiswa,
+        nama:          siswa.nama,
+        jenis:         sesi.jenis,
+        statusHadir:   statusHadir,
+        tarif:         0,
+        statusBayar:   'Belum',
+        jumlahDibayar: 0,
+        metode:        '',
+        tglBayar:      '',
+        dicatatOleh:   namaPelatih
+      };
+      appendAbsensi(newRecord);
+      logInfo('setAttendance baru: ' + idSiswa + ' -> ' + statusHadir + ' di sesi ' + idSesi);
+    }
+
+    return jsonResponse(true, 'ok', siswa.nama + ' dicatat ' + statusHadir + '.', {
+      idSesi:      idSesi,
+      idSiswa:     idSiswa,
+      nama:        siswa.nama,
+      statusHadir: statusHadir
+    });
+
+  } catch (err) {
+    logError('setAttendance error: ' + err.message);
+    return jsonResponse(false, 'server_error', 'Gagal menyimpan: ' + err.message, null);
+  } finally {
+    if (hasLock) lock.releaseLock();
+  }
 }
 
+// ─────────────────────────────────────────────
+// M3: deleteAttendance — Hapus kehadiran siswa
+// ─────────────────────────────────────────────
+
+/**
+ * Aksi: deleteAttendance
+ * Params: { idSesi, idSiswa }
+ *
+ * Cari baris via findAbsensiRow(), hapus dengan deleteAbsensiRow().
+ * Jika tidak ditemukan, return not_found.
+ */
 function deleteAttendance(body, namaPelatih) {
-  return jsonResponse(false, 'not_implemented', 'deleteAttendance akan tersedia di M3.', null);
+  var idSesi  = body.idSesi;
+  var idSiswa = body.idSiswa;
+
+  if (!idSesi || !idSiswa) {
+    return jsonResponse(false, 'invalid_input', 'ID Sesi dan ID Siswa wajib diisi.', null);
+  }
+  idSesi  = idSesi.trim();
+  idSiswa = idSiswa.trim();
+
+  var lock = LockService.getScriptLock();
+  var hasLock = false;
+  try {
+    hasLock = lock.tryLock(20000);
+    if (!hasLock) {
+      return jsonResponse(false, 'server_busy', 'Server sibuk, coba lagi.', null);
+    }
+
+    var existing = findAbsensiRow(idSesi, idSiswa);
+    if (!existing.found) {
+      return jsonResponse(false, 'not_found', 'Data absensi tidak ditemukan untuk siswa ini di sesi ini.', null);
+    }
+
+    deleteAbsensiRow(existing.rowIndex);
+    logInfo('deleteAttendance: ' + idSiswa + ' dihapus dari sesi ' + idSesi + ' oleh ' + namaPelatih);
+
+    return jsonResponse(true, 'ok', 'Kehadiran berhasil dihapus.', {
+      idSesi:  idSesi,
+      idSiswa: idSiswa
+    });
+
+  } catch (err) {
+    logError('deleteAttendance error: ' + err.message);
+    return jsonResponse(false, 'server_error', 'Gagal menghapus: ' + err.message, null);
+  } finally {
+    if (hasLock) lock.releaseLock();
+  }
 }
 
 function getSessionAttendance(body) {
