@@ -325,3 +325,105 @@ function testM1Comprehensive() {
   Logger.log('============================================');
 }
 
+// ─────────────────────────────────────────────
+// Fungsi uji M4: Verifikasi Pendapatan vs Ringkasan
+// ─────────────────────────────────────────────
+
+/**
+ * testM4Revenue — Uji silang hasil revenueMonth dengan sheet Ringkasan.
+ * Kriteria PRD M4: "hasil revenueMonth sama persis dengan sheet Ringkasan".
+ */
+function testM4Revenue() {
+  Logger.log('============================================');
+  Logger.log('MEMULAI PENGUJIAN M4 (PENDAPATAN & SESI)');
+  Logger.log('============================================');
+
+  var passedCount = 0;
+  var totalTests = 0;
+
+  function assert(testName, condition, detail) {
+    totalTests++;
+    if (condition) {
+      passedCount++;
+      Logger.log(' [PASS] ' + testName + (detail ? ' (' + detail + ')' : ''));
+    } else {
+      Logger.log(' [FAIL] ' + testName + (detail ? ' (' + detail + ')' : ''));
+    }
+  }
+
+  // 1. Panggil API revenueMonth untuk bulan 2026-11
+  var res = JSON.parse(getRevenueMonth({ bulan: '2026-11' }).getContent());
+  assert('1. revenueMonth mengembalikan response ok', res.ok === true && res.data, res.message);
+
+  if (!res.ok || !res.data) {
+    Logger.log('Gagal menjalankan uji M4: ' + res.message);
+    return;
+  }
+
+  var calc = res.data.ringkasan;
+
+  // 2. Baca data sheet Ringkasan baris 6, 7, 8 (Umum, Khusus, TOTAL)
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var sheet = ss.getSheetByName('Ringkasan');
+  var raw = sheet.getRange(6, 1, 3, 6).getValues();
+
+  var sheetUmum = {
+    jumlahSesi: Number(raw[0][1]) || 0,
+    totalHadir: Number(raw[0][2]) || 0,
+    seharusnya: Number(raw[0][3]) || 0,
+    diterima:   Number(raw[0][4]) || 0,
+    piutang:    Number(raw[0][5]) || 0
+  };
+
+  var sheetKhusus = {
+    jumlahSesi: Number(raw[1][1]) || 0,
+    totalHadir: Number(raw[1][2]) || 0,
+    seharusnya: Number(raw[1][3]) || 0,
+    diterima:   Number(raw[1][4]) || 0,
+    piutang:    Number(raw[1][5]) || 0
+  };
+
+  var sheetTotal = {
+    jumlahSesi: Number(raw[2][1]) || 0,
+    totalHadir: Number(raw[2][2]) || 0,
+    seharusnya: Number(raw[2][3]) || 0,
+    diterima:   Number(raw[2][4]) || 0,
+    piutang:    Number(raw[2][5]) || 0
+  };
+
+  // 3. Bandingkan Umum
+  assert('2. Umum: Jumlah Sesi cocok', calc.umum.jumlahSesi === sheetUmum.jumlahSesi, calc.umum.jumlahSesi + ' vs ' + sheetUmum.jumlahSesi);
+  assert('3. Umum: Total Hadir cocok', calc.umum.totalHadir === sheetUmum.totalHadir, calc.umum.totalHadir + ' vs ' + sheetUmum.totalHadir);
+  assert('4. Umum: Seharusnya cocok',  calc.umum.seharusnya === sheetUmum.seharusnya, calc.umum.seharusnya + ' vs ' + sheetUmum.seharusnya);
+  assert('5. Umum: Diterima cocok',    calc.umum.diterima === sheetUmum.diterima, calc.umum.diterima + ' vs ' + sheetUmum.diterima);
+  assert('6. Umum: Piutang cocok',     calc.umum.piutang === sheetUmum.piutang, calc.umum.piutang + ' vs ' + sheetUmum.piutang);
+
+  // 4. Bandingkan Khusus
+  assert('7. Khusus: Jumlah Sesi cocok', calc.khusus.jumlahSesi === sheetKhusus.jumlahSesi, calc.khusus.jumlahSesi + ' vs ' + sheetKhusus.jumlahSesi);
+  assert('8. Khusus: Total Hadir cocok', calc.khusus.totalHadir === sheetKhusus.totalHadir, calc.khusus.totalHadir + ' vs ' + sheetKhusus.totalHadir);
+  assert('9. Khusus: Seharusnya cocok',  calc.khusus.seharusnya === sheetKhusus.seharusnya, calc.khusus.seharusnya + ' vs ' + sheetKhusus.seharusnya);
+  assert('10. Khusus: Diterima cocok',   calc.khusus.diterima === sheetKhusus.diterima, calc.khusus.diterima + ' vs ' + sheetKhusus.diterima);
+  assert('11. Khusus: Piutang cocok',    calc.khusus.piutang === sheetKhusus.piutang, calc.khusus.piutang + ' vs ' + sheetKhusus.piutang);
+
+  // 5. Bandingkan TOTAL
+  assert('12. TOTAL: Jumlah Sesi cocok', calc.total.jumlahSesi === sheetTotal.jumlahSesi, calc.total.jumlahSesi + ' vs ' + sheetTotal.jumlahSesi);
+  assert('13. TOTAL: Total Hadir cocok', calc.total.totalHadir === sheetTotal.totalHadir, calc.total.totalHadir + ' vs ' + sheetTotal.totalHadir);
+  assert('14. TOTAL: Seharusnya cocok',  calc.total.seharusnya === sheetTotal.seharusnya, calc.total.seharusnya + ' vs ' + sheetTotal.seharusnya);
+  assert('15. TOTAL: Diterima cocok',    calc.total.diterima === sheetTotal.diterima, calc.total.diterima + ' vs ' + sheetTotal.diterima);
+  assert('16. TOTAL: Piutang cocok',     calc.total.piutang === sheetTotal.piutang, calc.total.piutang + ' vs ' + sheetTotal.piutang);
+
+  // 6. Uji debtors
+  var resDebtors = JSON.parse(getDebtors({}).getContent());
+  assert('17. debtors mengembalikan response ok', resDebtors.ok === true && Array.isArray(resDebtors.data.debtors), 'Jumlah penunggak: ' + (resDebtors.data ? resDebtors.data.debtors.length : 0));
+
+  Logger.log('============================================');
+  Logger.log('HASIL PENGUJIAN M4: ' + passedCount + ' / ' + totalTests + ' LULUS');
+  if (passedCount === totalTests) {
+    Logger.log('✅ SELURUH SKENARIO M4 LULUS 100%! Hasil sama persis dengan sheet Ringkasan.');
+  } else {
+    Logger.log('⚠️ Ada selisih perhitungan dengan sheet Ringkasan.');
+  }
+  Logger.log('============================================');
+  return { passed: passedCount, total: totalTests };
+}
+

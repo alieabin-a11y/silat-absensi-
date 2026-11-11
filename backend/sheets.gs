@@ -214,6 +214,38 @@ function getTarif() {
 // ─────────────────────────────────────────────
 
 /**
+ * Baca SEMUA data absensi dari sheet.
+ * Kolom: A=Timestamp, B=ID_Sesi, C=ID_Siswa, D=Nama, E=Jenis,
+ *        F=Status_Hadir, G=Tarif, H=Status_Bayar, I=Jumlah_Dibayar,
+ *        J=Metode, K=Tgl_Bayar, L=Dicatat_Oleh
+ */
+function getAllAbsensi() {
+  var sheet = getSpreadsheet().getSheetByName(SHEET_ABSENSI);
+  var lastRow = getLastDataRow(sheet, 'A');
+  if (lastRow === 0) return [];
+
+  var data = sheet.getRange(2, 1, lastRow, 12).getValues();
+  return data
+    .filter(function(row) { return row[0] !== '' && row[1] !== ''; })
+    .map(function(row) {
+      return {
+        timestamp:    row[0] ? formatTimestampWIB(row[0]) : '',
+        idSesi:       String(row[1]).trim(),
+        idSiswa:      String(row[2]).trim(),
+        nama:         String(row[3]).trim(),
+        jenis:        String(row[4]).trim(),
+        statusHadir:  String(row[5]).trim(),
+        tarif:        Number(row[6]) || 0,
+        statusBayar:  String(row[7]).trim(),
+        jumlahDibayar:Number(row[8]) || 0,
+        metode:       String(row[9]).trim(),
+        tglBayar:     row[10] ? formatDateWIB(row[10]) : '',
+        dicatatOleh:  String(row[11]).trim()
+      };
+    });
+}
+
+/**
  * Baca semua absensi untuk satu sesi.
  * Kolom: A=Timestamp, B=ID_Sesi, C=ID_Siswa, D=Nama, E=Jenis,
  *        F=Status_Hadir, G=Tarif, H=Status_Bayar, I=Jumlah_Dibayar,

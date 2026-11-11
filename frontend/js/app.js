@@ -165,6 +165,36 @@ const modalActions = document.getElementById('modalActions');
 // M3: Tutup Sesi
 const btnCloseSession = document.getElementById('btnCloseSession');
 
+// M4: Tab & Pendapatan & Tunggakan & Sesi
+const navTabs = document.querySelectorAll('.nav-tab');
+const tabPanes = document.querySelectorAll('.tab-pane');
+const inputMonthRevenue = document.getElementById('inputMonthRevenue');
+const btnRefreshRevenue = document.getElementById('btnRefreshRevenue');
+const revTotalHadir = document.getElementById('revTotalHadir');
+const revTotalSesi = document.getElementById('revTotalSesi');
+const revTotalDiterima = document.getElementById('revTotalDiterima');
+const revTotalPiutang = document.getElementById('revTotalPiutang');
+const revUmumHadirSesi = document.getElementById('revUmumHadirSesi');
+const revUmumUang = document.getElementById('revUmumUang');
+const revKhususHadirSesi = document.getElementById('revKhususHadirSesi');
+const revKhususUang = document.getElementById('revKhususUang');
+const tableRevenuePerSesiBody = document.getElementById('tableRevenuePerSesiBody');
+
+const btnRefreshDebtors = document.getElementById('btnRefreshDebtors');
+const debtorSummaryText = document.getElementById('debtorSummaryText');
+const debtorsList = document.getElementById('debtorsList');
+
+const btnRefreshSessions = document.getElementById('btnRefreshSessions');
+const sessionsManageList = document.getElementById('sessionsManageList');
+const sessionModal = document.getElementById('sessionModal');
+const modalSessionTitle = document.getElementById('modalSessionTitle');
+const editSessionId = document.getElementById('editSessionId');
+const editSessionStatus = document.getElementById('editSessionStatus');
+const editSessionActualDate = document.getElementById('editSessionActualDate');
+const editSessionKeterangan = document.getElementById('editSessionKeterangan');
+const btnSaveSessionEdit = document.getElementById('btnSaveSessionEdit');
+const btnCancelSessionEdit = document.getElementById('btnCancelSessionEdit');
+
 // ─────────────────────────────────────────────
 // Inisialisasi Aplikasi
 // ─────────────────────────────────────────────
@@ -184,6 +214,18 @@ document.addEventListener('DOMContentLoaded', () => {
   btnToggleCamera.addEventListener('click', toggleCamera);
   inputManualSearch.addEventListener('input', handleManualSearch);
   if (btnCloseSession) btnCloseSession.addEventListener('click', handleCloseSession);
+
+  // M4 Event Listeners
+  navTabs.forEach(tab => {
+    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+  });
+
+  if (btnRefreshRevenue) btnRefreshRevenue.addEventListener('click', () => loadRevenueMonth(inputMonthRevenue.value));
+  if (inputMonthRevenue) inputMonthRevenue.addEventListener('change', () => loadRevenueMonth(inputMonthRevenue.value));
+  if (btnRefreshDebtors) btnRefreshDebtors.addEventListener('click', () => loadDebtors());
+  if (btnRefreshSessions) btnRefreshSessions.addEventListener('click', () => renderSessionsManage());
+  if (btnSaveSessionEdit) btnSaveSessionEdit.addEventListener('click', handleSaveSessionEdit);
+  if (btnCancelSessionEdit) btnCancelSessionEdit.addEventListener('click', closeSessionEditModal);
 });
 
 // ─────────────────────────────────────────────
@@ -278,6 +320,11 @@ async function initDashboard() {
     renderSessionInfo();
     populateSessionDropdown();
     startCamera();
+
+    // M4: Set default bulan di input
+    if (inputMonthRevenue && appData.today) {
+      inputMonthRevenue.value = appData.today.substring(0, 7);
+    }
 
   } catch (err) {
     sessionTitle.textContent = 'Koneksi gagal. Muat ulang halaman.';
@@ -1091,5 +1138,254 @@ async function handleCloseSession() {
     showFeedback('danger', 'Koneksi Error', 'Gagal menghubungi server.');
     btnCloseSession.disabled = false;
     btnCloseSession.textContent = '🔒 Tutup Sesi (Tandai Terlaksana)';
+  }
+}
+
+// ─────────────────────────────────────────────
+// M4: Navigasi Tab
+// ─────────────────────────────────────────────
+
+function switchTab(tabId) {
+  navTabs.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabId);
+  });
+  tabPanes.forEach(pane => {
+    pane.classList.toggle('hidden', pane.id !== tabId);
+  });
+
+  if (tabId === 'panePresensi') {
+    resumeScanner();
+  } else {
+    pauseScanner();
+  }
+
+  if (tabId === 'panePendapatan') {
+    const bulan = inputMonthRevenue.value || (appData.today ? appData.today.substring(0, 7) : '');
+    loadRevenueMonth(bulan);
+  } else if (tabId === 'paneTunggakan') {
+    loadDebtors();
+  } else if (tabId === 'paneKelolaSesi') {
+    renderSessionsManage();
+  }
+}
+
+// ─────────────────────────────────────────────
+// M4: Pendapatan & Rekap Bulanan
+// ─────────────────────────────────────────────
+
+async function loadRevenueMonth(month) {
+  if (!month) {
+    month = appData.today ? appData.today.substring(0, 7) : new Date().toISOString().substring(0, 7);
+  }
+  tableRevenuePerSesiBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 12px 0;">Memuat pendapatan...</td></tr>';
+  try {
+    const res = await apiRequest('revenueMonth', { bulan: month });
+    if (res.ok && res.data) {
+      renderRevenueData(res.data);
+    } else {
+      tableRevenuePerSesiBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--danger); padding: 12px 0;">${res.message || 'Gagal memuat data.'}</td></tr>`;
+    }
+  } catch (err) {
+    tableRevenuePerSesiBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--danger); padding: 12px 0;">Koneksi gagal.</td></tr>';
+  }
+}
+
+function renderRevenueData(data) {
+  const r = data.ringkasan;
+  revTotalHadir.textContent = `${r.total.totalHadir} Siswa`;
+  revTotalSesi.textContent = `${r.total.jumlahSesi} Sesi`;
+  revTotalDiterima.textContent = `Rp${r.total.diterima.toLocaleString('id-ID')}`;
+  revTotalPiutang.textContent = `Rp${r.total.piutang.toLocaleString('id-ID')}`;
+
+  revUmumHadirSesi.textContent = `${r.umum.totalHadir} Hadir / ${r.umum.jumlahSesi} Sesi`;
+  revUmumUang.textContent = `Rp${r.umum.diterima.toLocaleString('id-ID')} / Rp${r.umum.piutang.toLocaleString('id-ID')}`;
+
+  revKhususHadirSesi.textContent = `${r.khusus.totalHadir} Hadir / ${r.khusus.jumlahSesi} Sesi`;
+  revKhususUang.textContent = `Rp${r.khusus.diterima.toLocaleString('id-ID')} / Rp${r.khusus.piutang.toLocaleString('id-ID')}`;
+
+  // Tabel per sesi
+  if (!data.perSesi || data.perSesi.length === 0) {
+    tableRevenuePerSesiBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 12px 0;">Tidak ada sesi di bulan ini.</td></tr>';
+    return;
+  }
+
+  tableRevenuePerSesiBody.innerHTML = '';
+  data.perSesi.forEach(s => {
+    const tr = document.createElement('tr');
+    const badgeColor = s.jenis === 'Khusus' ? 'color: var(--accent);' : 'color: var(--primary);';
+    const statusLabel = s.statusSesi === 'Terlaksana' ? '✓' : s.statusSesi === 'Batal' ? '✕' : '';
+    tr.innerHTML = `
+      <td><strong style="${badgeColor}">[${s.jenis.substring(0,1)}]</strong> ${s.idSesi} <span style="font-size: 0.7rem; color: var(--text-muted);">${statusLabel}</span></td>
+      <td>${s.tanggal.substring(5)}</td>
+      <td><strong>${s.jumlahHadir}</strong></td>
+      <td class="text-success" style="font-weight: 600;">Rp${s.diterima.toLocaleString('id-ID')}</td>
+      <td class="${s.piutang > 0 ? 'text-danger' : 'text-muted'}" style="font-weight: 600;">Rp${s.piutang.toLocaleString('id-ID')}</td>
+    `;
+    tableRevenuePerSesiBody.appendChild(tr);
+  });
+}
+
+// ─────────────────────────────────────────────
+// M4: Daftar Tunggakan Siswa
+// ─────────────────────────────────────────────
+
+async function loadDebtors() {
+  debtorsList.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Memuat daftar penunggak...</p>';
+  debtorSummaryText.textContent = 'Memuat...';
+  try {
+    const res = await apiRequest('debtors');
+    if (res.ok && res.data) {
+      renderDebtorsList(res.data);
+    } else {
+      debtorsList.innerHTML = `<p style="font-size: 0.85rem; color: var(--danger); text-align: center; padding: 12px 0;">${res.message || 'Gagal memuat tunggakan.'}</p>`;
+    }
+  } catch (err) {
+    debtorsList.innerHTML = '<p style="font-size: 0.85rem; color: var(--danger); text-align: center; padding: 12px 0;">Koneksi gagal.</p>';
+  }
+}
+
+function renderDebtorsList(data) {
+  debtorSummaryText.textContent = `${data.totalSiswa} Siswa Menunggak • Total Rp${data.totalTunggakan.toLocaleString('id-ID')}`;
+
+  if (!data.debtors || data.debtors.length === 0) {
+    debtorsList.innerHTML = '<p style="font-size: 0.85rem; color: var(--success); text-align: center; padding: 18px 0; font-weight: 600;">🎉 Alhamdulillah, tidak ada tunggakan pembayaran!</p>';
+    return;
+  }
+
+  debtorsList.innerHTML = '';
+  data.debtors.forEach(d => {
+    const card = document.createElement('div');
+    card.className = 'debtor-card';
+
+    let sessionsHtml = '';
+    d.sesiList.forEach(item => {
+      sessionsHtml += `
+        <div class="debtor-session-item">
+          <div>
+            <strong>${item.idSesi}</strong> (${item.tanggal})
+            <div style="font-size: 0.75rem; color: var(--text-muted);">${item.jenis} • Tarif: Rp${item.tarif.toLocaleString('id-ID')} • Dibayar: Rp${item.jumlahDibayar.toLocaleString('id-ID')}</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-weight: 700; color: var(--danger); margin-bottom: 4px;">Sisa Rp${item.sisa.toLocaleString('id-ID')}</div>
+            <button class="btn btn-success btn-sm" style="padding: 3px 8px; font-size: 0.72rem; width: auto;" onclick="payDebtorItem('${item.idSesi}', '${d.idSiswa}', '${d.nama}', ${item.sisa})">Tandai Lunas</button>
+          </div>
+        </div>
+      `;
+    });
+
+    card.innerHTML = `
+      <div class="debtor-header">
+        <div>
+          <div class="debtor-name">${d.nama} ${d.panggilan ? '(' + d.panggilan + ')' : ''}</div>
+          <div class="debtor-meta">${d.idSiswa} ${d.tingkatan ? '• ' + d.tingkatan : ''} • ${d.jumlahSesi} Sesi Belum Lunas</div>
+        </div>
+        <div class="debtor-amount">Rp${d.totalTunggakan.toLocaleString('id-ID')}</div>
+      </div>
+      <div>
+        ${sessionsHtml}
+      </div>
+    `;
+    debtorsList.appendChild(card);
+  });
+}
+
+async function payDebtorItem(idSesi, idSiswa, nama, sisa) {
+  if (confirm(`Tandai Lunas sesi ${idSesi} untuk ${nama} sebesar Rp${sisa.toLocaleString('id-ID')}?`)) {
+    await markQuickPaid(idSesi, idSiswa);
+    loadDebtors();
+  }
+}
+window.payDebtorItem = payDebtorItem;
+
+// ─────────────────────────────────────────────
+// M4: Kelola Sesi Latihan
+// ─────────────────────────────────────────────
+
+function renderSessionsManage() {
+  if (!appData.sesi || appData.sesi.length === 0) {
+    sessionsManageList.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Tidak ada data sesi.</p>';
+    return;
+  }
+
+  sessionsManageList.innerHTML = '';
+  appData.sesi.forEach(s => {
+    const item = document.createElement('div');
+    item.className = 'session-manage-item';
+    const isTerlaksana = s.statusSesi === 'Terlaksana';
+    const isBatal = s.statusSesi === 'Batal';
+    const statusClass = isTerlaksana ? 'badge-paid' : isBatal ? 'badge-unpaid' : 'session-badge badge-umum';
+
+    item.innerHTML = `
+      <div class="session-manage-header">
+        <div>
+          <strong style="color: var(--primary); font-size: 0.95rem;">${s.idSesi}</strong>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">(${s.jenis})</span>
+        </div>
+        <span class="${statusClass}" style="font-size: 0.75rem; padding: 3px 8px;">${s.statusSesi}</span>
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">
+        <div>Tgl Rencana: ${s.tglRencana || '-'}</div>
+        <div>Tgl Aktual: <strong>${s.tglAktual || '(Sesuai rencana)'}</strong></div>
+        ${s.keterangan ? `<div style="color: var(--text); margin-top: 2px;">Ket: ${s.keterangan}</div>` : ''}
+      </div>
+      <button class="btn btn-secondary btn-sm" style="width: 100%; font-size: 0.8rem; padding: 6px;">⚙️ Edit Sesi (Geser / Status)</button>
+    `;
+    item.querySelector('button').addEventListener('click', () => {
+      openSessionEditModal(s);
+    });
+    sessionsManageList.appendChild(item);
+  });
+}
+
+function openSessionEditModal(s) {
+  editSessionId.value = s.idSesi;
+  modalSessionTitle.textContent = `Edit Sesi: ${s.idSesi}`;
+  editSessionStatus.value = s.statusSesi || 'Terjadwal';
+  editSessionActualDate.value = s.tglAktual || s.tglRencana || '';
+  editSessionKeterangan.value = s.keterangan || '';
+  sessionModal.classList.remove('hidden');
+}
+
+function closeSessionEditModal() {
+  sessionModal.classList.add('hidden');
+}
+
+async function handleSaveSessionEdit() {
+  const idSesi = editSessionId.value;
+  const statusSesi = editSessionStatus.value;
+  const tanggalAktual = editSessionActualDate.value.trim();
+  const keterangan = editSessionKeterangan.value.trim();
+
+  btnSaveSessionEdit.disabled = true;
+  btnSaveSessionEdit.textContent = 'Menyimpan...';
+
+  try {
+    const res = await apiRequest('updateSession', {
+      idSesi: idSesi,
+      statusSesi: statusSesi,
+      tanggalAktual: tanggalAktual,
+      keterangan: keterangan
+    });
+
+    if (res.ok && res.data && res.data.sesi) {
+      playChime('success');
+      // Update local state
+      const idx = appData.sesi.findIndex(x => x.idSesi === idSesi);
+      if (idx !== -1) appData.sesi[idx] = res.data.sesi;
+      if (appData.sesiAktif && appData.sesiAktif.idSesi === idSesi) {
+        appData.sesiAktif = res.data.sesi;
+        renderSessionInfo();
+      }
+      closeSessionEditModal();
+      renderSessionsManage();
+      showFeedback('success', 'Sesi Diperbarui', `Sesi ${idSesi} berhasil diupdate.`);
+    } else {
+      alert(res.message || 'Gagal menyimpan perubahan sesi.');
+    }
+  } catch (err) {
+    alert('Koneksi gagal saat update sesi.');
+  } finally {
+    btnSaveSessionEdit.disabled = false;
+    btnSaveSessionEdit.textContent = 'Simpan Perubahan';
   }
 }

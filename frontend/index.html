@@ -62,69 +62,247 @@
     <!-- 2. VIEW DASHBOARD / SCAN (Muncul setelah login) -->
     <section id="dashboardSection" class="hidden">
 
-      <!-- Banner Info Sesi Aktif -->
-      <div class="session-banner">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span id="sessionBadge" class="session-badge badge-umum">Umum</span>
-          <span id="sessionTarif" style="font-weight: 700; color: var(--primary); font-size: 0.95rem;">Rp15.000</span>
-        </div>
-        <div class="session-title" id="sessionTitle">Memuat sesi...</div>
-        <div class="session-meta" id="sessionMeta">Tanggal: -</div>
+      <!-- Navigasi Tab Menu Pelatih -->
+      <nav class="nav-tabs">
+        <button class="nav-tab active" data-tab="panePresensi">
+          <span>📷</span>
+          <span>Presensi</span>
+        </button>
+        <button class="nav-tab" data-tab="panePendapatan">
+          <span>💰</span>
+          <span>Pendapatan</span>
+        </button>
+        <button class="nav-tab" data-tab="paneTunggakan">
+          <span>⏳</span>
+          <span>Tunggakan</span>
+        </button>
+        <button class="nav-tab" data-tab="paneKelolaSesi">
+          <span>⚙️</span>
+          <span>Sesi</span>
+        </button>
+      </nav>
 
-        <!-- Tombol Ganti Sesi -->
-        <div style="margin-top: 10px;">
-          <button id="btnToggleSessionSelect" class="btn btn-secondary btn-sm" style="width: 100%;">
-            Pilih Sesi Lain ▼
-          </button>
-          <div id="sessionSelectContainer" class="hidden" style="margin-top: 10px;">
-            <select id="selectSession" class="form-control"></select>
+      <!-- TAB 1: PRESENSI & SCAN -->
+      <div id="panePresensi" class="tab-pane">
+        <!-- Banner Info Sesi Aktif -->
+        <div class="session-banner">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span id="sessionBadge" class="session-badge badge-umum">Umum</span>
+            <span id="sessionTarif" style="font-weight: 700; color: var(--primary); font-size: 0.95rem;">Rp15.000</span>
+          </div>
+          <div class="session-title" id="sessionTitle">Memuat sesi...</div>
+          <div class="session-meta" id="sessionMeta">Tanggal: -</div>
+
+          <!-- Tombol Ganti Sesi -->
+          <div style="margin-top: 10px;">
+            <button id="btnToggleSessionSelect" class="btn btn-secondary btn-sm" style="width: 100%;">
+              Pilih Sesi Lain ▼
+            </button>
+            <div id="sessionSelectContainer" class="hidden" style="margin-top: 10px;">
+              <select id="selectSession" class="form-control"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kamera Scan QR -->
+        <div class="card scanner-card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h2 style="font-size: 1.1rem; color: var(--primary);">Scan Kartu QR</h2>
+            <button id="btnToggleCamera" class="btn btn-secondary btn-sm">Jeda Kamera</button>
+          </div>
+
+          <!-- Kotak Kamera html5-qrcode -->
+          <div id="reader"></div>
+
+          <!-- Feedback Alert Cards -->
+          <div id="feedbackCard" class="feedback-card">
+            <div id="feedbackTitle" class="feedback-title">Status Absensi</div>
+            <div id="feedbackDesc" class="feedback-desc">Keterangan hasil scan</div>
+            <div id="feedbackActions" class="feedback-actions"></div>
+          </div>
+
+          <!-- Manual Search Box (Fallback jika QR rusak) -->
+          <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px;">
+            <label for="inputManualSearch">Cari Manual Siswa</label>
+            <input type="text" id="inputManualSearch" class="form-control" placeholder="Ketik nama / ID siswa (contoh: Yasmin, S001)">
+            <div id="studentSearchResults" class="student-search-results"></div>
+          </div>
+        </div>
+
+        <!-- Riwayat Absensi Sesi Ini -->
+        <div class="card">
+          <div class="attendance-history-title">
+            <h3 style="font-size: 1rem; color: var(--primary);">Kehadiran Sesi Ini</h3>
+            <span id="attendanceCount" style="font-weight: 700; font-size: 0.9rem;">0 Hadir</span>
+          </div>
+          <div id="attendanceList">
+            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Belum ada siswa yang discan pada sesi ini.</p>
+          </div>
+          <!-- Tombol Tutup Sesi -->
+          <div style="margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px;">
+            <button id="btnCloseSession" class="btn btn-secondary" style="width: 100%; font-size: 0.9rem;">
+              🔒 Tutup Sesi (Tandai Terlaksana)
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- Kamera Scan QR -->
-      <div class="card scanner-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <h2 style="font-size: 1.1rem; color: var(--primary);">Scan Kartu QR</h2>
-          <button id="btnToggleCamera" class="btn btn-secondary btn-sm">Jeda Kamera</button>
-        </div>
+      <!-- TAB 2: PENDAPATAN & REKAP BULANAN -->
+      <div id="panePendapatan" class="tab-pane hidden">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h2 style="font-size: 1.1rem; color: var(--primary);">Pendapatan Bulanan</h2>
+            <div style="display: flex; gap: 6px;">
+              <input type="month" id="inputMonthRevenue" class="form-control" style="padding: 4px 8px; font-size: 0.85rem; width: auto;">
+              <button id="btnRefreshRevenue" class="btn btn-secondary btn-sm" style="padding: 4px 10px;">🔄</button>
+            </div>
+          </div>
 
-        <!-- Kotak Kamera html5-qrcode -->
-        <div id="reader"></div>
+          <!-- Stat Box: TOTAL -->
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-bottom: 8px;">📊 TOTAL KESELURUHAN</div>
+            <div class="stat-grid">
+              <div class="stat-box">
+                <div class="stat-box-title">Total Hadir</div>
+                <div id="revTotalHadir" class="stat-box-value">-</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-box-title">Jumlah Sesi (Terlaksana)</div>
+                <div id="revTotalSesi" class="stat-box-value">-</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-box-title">Diterima</div>
+                <div id="revTotalDiterima" class="stat-box-value text-success">-</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-box-title">Piutang (Belum Bayar)</div>
+                <div id="revTotalPiutang" class="stat-box-value text-danger">-</div>
+              </div>
+            </div>
+          </div>
 
-        <!-- Feedback Alert Cards -->
-        <div id="feedbackCard" class="feedback-card">
-          <div id="feedbackTitle" class="feedback-title">Status Absensi</div>
-          <div id="feedbackDesc" class="feedback-desc">Keterangan hasil scan</div>
-          <div id="feedbackActions" class="feedback-actions"></div>
-        </div>
+          <!-- Stat Box: UMUM vs KHUSUS -->
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--text); margin-bottom: 8px;">🥊 LATIHAN UMUM (Sabtu)</div>
+            <div class="stat-grid">
+              <div class="stat-box">
+                <div class="stat-box-title">Hadir / Sesi</div>
+                <div id="revUmumHadirSesi" class="stat-box-value" style="font-size: 0.95rem;">-</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-box-title">Diterima / Piutang</div>
+                <div id="revUmumUang" class="stat-box-value" style="font-size: 0.95rem;">-</div>
+              </div>
+            </div>
+          </div>
 
-        <!-- Manual Search Box (Fallback jika QR rusak) -->
-        <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px;">
-          <label for="inputManualSearch">Cari Manual Siswa</label>
-          <input type="text" id="inputManualSearch" class="form-control" placeholder="Ketik nama / ID siswa (contoh: Yasmin, S001)">
-          <div id="studentSearchResults" class="student-search-results"></div>
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--text); margin-bottom: 8px;">🏆 LATIHAN KHUSUS (Sel/Kam)</div>
+            <div class="stat-grid">
+              <div class="stat-box">
+                <div class="stat-box-title">Hadir / Sesi</div>
+                <div id="revKhususHadirSesi" class="stat-box-value" style="font-size: 0.95rem;">-</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-box-title">Diterima / Piutang</div>
+                <div id="revKhususUang" class="stat-box-value" style="font-size: 0.95rem;">-</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rincian Tabel Per Sesi -->
+          <div style="border-top: 1px solid var(--border); padding-top: 14px;">
+            <h3 style="font-size: 0.95rem; color: var(--primary); margin-bottom: 8px;">Rincian Per Sesi</h3>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Sesi</th>
+                    <th>Tgl</th>
+                    <th>Hadir</th>
+                    <th>Diterima</th>
+                    <th>Piutang</th>
+                  </tr>
+                </thead>
+                <tbody id="tableRevenuePerSesiBody">
+                  <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Memuat data pendapatan...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Riwayat Absensi Sesi Ini -->
-      <div class="card">
-        <div class="attendance-history-title">
-          <h3 style="font-size: 1rem; color: var(--primary);">Kehadiran Sesi Ini</h3>
-          <span id="attendanceCount" style="font-weight: 700; font-size: 0.9rem;">0 Hadir</span>
+      <!-- TAB 3: TUNGGAKAN SISWA -->
+      <div id="paneTunggakan" class="tab-pane hidden">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div>
+              <h2 style="font-size: 1.1rem; color: var(--primary);">Daftar Tunggakan</h2>
+              <div id="debtorSummaryText" style="font-size: 0.8rem; color: var(--text-muted);">Memuat tunggakan...</div>
+            </div>
+            <button id="btnRefreshDebtors" class="btn btn-secondary btn-sm">🔄</button>
+          </div>
+
+          <!-- Kontainer Kartu Penunggak -->
+          <div id="debtorsList">
+            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Memuat daftar penunggak...</p>
+          </div>
         </div>
-        <div id="attendanceList">
-          <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Belum ada siswa yang discan pada sesi ini.</p>
-        </div>
-        <!-- Tombol Tutup Sesi -->
-        <div style="margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px;">
-          <button id="btnCloseSession" class="btn btn-secondary" style="width: 100%; font-size: 0.9rem;">
-            🔒 Tutup Sesi (Tandai Terlaksana)
-          </button>
+      </div>
+
+      <!-- TAB 4: KELOLA SESI -->
+      <div id="paneKelolaSesi" class="tab-pane hidden">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h2 style="font-size: 1.1rem; color: var(--primary);">Kelola Sesi Latihan</h2>
+            <button id="btnRefreshSessions" class="btn btn-secondary btn-sm">🔄</button>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">
+            Ubah tanggal aktual (jika jadwal digeser), status sesi (Terjadwal/Terlaksana/Batal), atau catatan.
+          </p>
+
+          <div id="sessionsManageList">
+            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Memuat daftar sesi...</p>
+          </div>
         </div>
       </div>
 
     </section>
+
+    <!-- Modal Edit Sesi -->
+    <div id="sessionModal" class="modal-overlay hidden">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <div class="modal-icon">⚙️</div>
+          <h3 id="modalSessionTitle" class="modal-title">Edit Sesi</h3>
+        </div>
+        <div class="modal-body" style="text-align: left;">
+          <input type="hidden" id="editSessionId">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label style="font-size: 0.8rem; font-weight: 600;">Status Sesi</label>
+            <select id="editSessionStatus" class="form-control">
+              <option value="Terjadwal">Terjadwal</option>
+              <option value="Terlaksana">Terlaksana</option>
+              <option value="Batal">Batal</option>
+              <option value="Ditunda">Ditunda</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label style="font-size: 0.8rem; font-weight: 600;">Tanggal Aktual (jika digeser)</label>
+            <input type="date" id="editSessionActualDate" class="form-control">
+          </div>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label style="font-size: 0.8rem; font-weight: 600;">Keterangan</label>
+            <input type="text" id="editSessionKeterangan" class="form-control" placeholder="Contoh: Digeser karena hujan">
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="btnSaveSessionEdit" class="btn btn-primary">Simpan Perubahan</button>
+          <button id="btnCancelSessionEdit" class="btn btn-secondary">Batal</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Modal Popup Status Pembayaran & Jeda Kamera -->
     <div id="scanModal" class="modal-overlay hidden">
@@ -146,7 +324,7 @@
 
   </main>
 
-  <script src="js/app.js?v=2.0"></script>
+  <script src="js/app.js?v=2.1"></script>
 </body>
 </html>
 

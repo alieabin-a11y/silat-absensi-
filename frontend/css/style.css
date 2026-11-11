@@ -464,3 +464,182 @@ label {
   to { transform: rotate(360deg); }
 }
 
+/* ─────────────────────────────────────────────
+   M4: Tab Navigation & Revenue / Debtors Styles
+   ───────────────────────────────────────────── */
+
+.nav-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 16px;
+  background: #e9ecef;
+  padding: 4px;
+  border-radius: var(--radius);
+}
+
+.nav-tab {
+  background: transparent;
+  border: none;
+  padding: 10px 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.nav-tab.active {
+  background: #ffffff;
+  color: var(--primary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.tab-pane {
+  display: block;
+}
+
+.tab-pane.hidden {
+  display: none !important;
+}
+
+/* Stat Grid Bulanan */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.stat-box {
+  background: #f8f9fa;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.stat-box-title {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.stat-box-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stat-box-value.text-primary {
+  color: var(--primary);
+}
+
+.stat-box-value.text-danger {
+  color: var(--danger);
+}
+
+.stat-box-value.text-success {
+  color: var(--success);
+}
+
+/* Table Responsive */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 10px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.data-table th {
+  background: #f1f3f5;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.data-table tr:hover {
+  background: #f8f9fa;
+}
+
+/* Debtor Card */
+.debtor-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: #fff;
+  transition: border-color 0.2s;
+}
+
+.debtor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.debtor-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.debtor-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.debtor-amount {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--danger);
+  text-align: right;
+}
+
+.debtor-session-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px dashed var(--border);
+  font-size: 0.8rem;
+}
+
+/* Session Item Manage */
+.session-manage-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.session-manage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+
