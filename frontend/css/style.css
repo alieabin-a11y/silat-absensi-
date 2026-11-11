@@ -1,0 +1,389 @@
+/* style.css — Absensi Silat Putra Setia Rawa Bebek */
+:root {
+  --primary: #1b5e20;
+  --primary-hover: #144618;
+  --primary-light: #e8f5e9;
+  --accent: #ff8f00;
+  --bg: #f8f9fa;
+  --card-bg: #ffffff;
+  --text: #212529;
+  --text-muted: #6c757d;
+  --border: #dee2e6;
+
+  /* Status Colors */
+  --success: #2e7d32;
+  --success-bg: #e8f5e9;
+  --warning: #f57f17;
+  --warning-bg: #fffde7;
+  --caution: #e65100;
+  --caution-bg: #fff3e0;
+  --danger: #c62828;
+  --danger-bg: #ffebee;
+
+  --radius: 12px;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-width: 360px;
+  padding-bottom: 30px;
+}
+
+.container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* Header */
+.app-header {
+  background: #ffffff;
+  border-bottom: 2px solid var(--border);
+  padding: 12px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+}
+
+.header-content {
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary);
+}
+
+.brand-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1.2;
+}
+
+.brand-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Card */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+/* Forms & Inputs */
+.form-group {
+  margin-bottom: 16px;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+}
+
+.form-control {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+  background-color: #fff;
+  transition: border-color 0.2s;
+}
+
+.form-control:focus {
+  border-color: var(--primary);
+}
+
+/* Buttons (Touch-friendly >= 48px) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background-color: var(--primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-secondary {
+  background-color: #e9ecef;
+  color: var(--text);
+}
+
+.btn-success {
+  background-color: var(--success);
+  color: #fff;
+}
+
+.btn-danger {
+  background-color: var(--danger);
+  color: #fff;
+}
+
+.btn-sm {
+  min-height: 38px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  width: auto;
+}
+
+/* Session Info Banner */
+.session-banner {
+  background: var(--primary-light);
+  border: 1px solid #c8e6c9;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.session-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.badge-umum {
+  background-color: #1976d2;
+  color: #fff;
+}
+
+.badge-khusus {
+  background-color: #d32f2f;
+  color: #fff;
+}
+
+.session-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.session-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Scanner Container */
+.scanner-card {
+  position: relative;
+  overflow: hidden;
+  padding: 12px;
+}
+
+#reader {
+  width: 100% !important;
+  border-radius: 8px;
+  overflow: hidden;
+  border: none !important;
+  background: #000;
+}
+
+#reader video {
+  width: 100% !important;
+  border-radius: 8px;
+}
+
+/* Scanner Feedback Overlay / Cards */
+.feedback-card {
+  padding: 16px;
+  border-radius: var(--radius);
+  margin-top: 14px;
+  display: none;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.feedback-success {
+  background-color: var(--success-bg);
+  border: 2px solid var(--success);
+  color: #1b5e20;
+}
+
+.feedback-duplicate {
+  background-color: var(--warning-bg);
+  border: 2px solid var(--warning);
+  color: #e65100;
+}
+
+.feedback-warning {
+  background-color: var(--caution-bg);
+  border: 2px solid var(--caution);
+  color: #b73800;
+}
+
+.feedback-danger {
+  background-color: var(--danger-bg);
+  border: 2px solid var(--danger);
+  color: #b71c1c;
+}
+
+.feedback-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.feedback-desc {
+  font-size: 0.9rem;
+}
+
+.feedback-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* Manual Search List */
+.student-search-results {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 8px;
+  display: none;
+}
+
+.student-item {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.student-item:last-child {
+  border-bottom: none;
+}
+
+.student-item:hover, .student-item:active {
+  background-color: var(--primary-light);
+}
+
+/* Recent Attendance List */
+.attendance-history-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.attendance-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.attendance-item:last-child {
+  border-bottom: none;
+}
+
+.attendance-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.attendance-time {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.badge-paid {
+  background-color: var(--success-bg);
+  color: var(--success);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.badge-unpaid {
+  background-color: var(--danger-bg);
+  color: var(--danger);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Utility */
+.hidden {
+  display: none !important;
+}
+
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 0.8s ease-in-out infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

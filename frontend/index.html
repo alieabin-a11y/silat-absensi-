@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1b5e20">
+  <title>Absensi Putra Setia Rawa Bebek</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- html5-qrcode pinned version 2.3.8 -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+
+  <!-- Top Navigation / Header -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand">
+        <img src="img/logo.jpg" alt="Logo Putra Setia" class="brand-logo" onerror="this.style.display='none'">
+        <div>
+          <h1 class="brand-title">Putra Setia</h1>
+          <p class="brand-subtitle">Absensi Rawa Bebek</p>
+        </div>
+      </div>
+      <div id="coachProfileHeader" class="hidden" style="text-align: right;">
+        <span id="coachDisplayName" style="font-weight: 700; font-size: 0.9rem; display: block;">Pelatih</span>
+        <button id="btnLogout" class="btn btn-secondary btn-sm" style="margin-top: 2px;">Keluar</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- 1. VIEW LOGIN PELATIH -->
+    <section id="loginSection" class="card">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <h2 style="font-size: 1.3rem; color: var(--primary);">Masuk Pelatih</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Masukkan nama pelatih dan passcode rahasia</p>
+      </div>
+
+      <div id="loginAlert" class="feedback-card feedback-danger" style="margin-bottom: 16px;"></div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="selectCoach">Nama Pelatih</label>
+          <select id="selectCoach" class="form-control" required>
+            <option value="Basyair">Basyair</option>
+            <option value="Febri">Febri</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="inputPasscode">Passcode</label>
+          <input type="password" id="inputPasscode" class="form-control" placeholder="Masukkan passcode" required inputmode="numeric">
+        </div>
+
+        <button type="submit" id="btnLogin" class="btn btn-primary">
+          <span>Masuk Dashboard</span>
+        </button>
+      </form>
+    </section>
+
+    <!-- 2. VIEW DASHBOARD / SCAN (Muncul setelah login) -->
+    <section id="dashboardSection" class="hidden">
+
+      <!-- Banner Info Sesi Aktif -->
+      <div class="session-banner">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span id="sessionBadge" class="session-badge badge-umum">Umum</span>
+          <span id="sessionTarif" style="font-weight: 700; color: var(--primary); font-size: 0.95rem;">Rp15.000</span>
+        </div>
+        <div class="session-title" id="sessionTitle">Memuat sesi...</div>
+        <div class="session-meta" id="sessionMeta">Tanggal: -</div>
+
+        <!-- Tombol Ganti Sesi -->
+        <div style="margin-top: 10px;">
+          <button id="btnToggleSessionSelect" class="btn btn-secondary btn-sm" style="width: 100%;">
+            Pilih Sesi Lain ▼
+          </button>
+          <div id="sessionSelectContainer" class="hidden" style="margin-top: 10px;">
+            <select id="selectSession" class="form-control"></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kamera Scan QR -->
+      <div class="card scanner-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <h2 style="font-size: 1.1rem; color: var(--primary);">Scan Kartu QR</h2>
+          <button id="btnToggleCamera" class="btn btn-secondary btn-sm">Jeda Kamera</button>
+        </div>
+
+        <!-- Kotak Kamera html5-qrcode -->
+        <div id="reader"></div>
+
+        <!-- Feedback Alert Cards -->
+        <div id="feedbackCard" class="feedback-card">
+          <div id="feedbackTitle" class="feedback-title">Status Absensi</div>
+          <div id="feedbackDesc" class="feedback-desc">Keterangan hasil scan</div>
+          <div id="feedbackActions" class="feedback-actions"></div>
+        </div>
+
+        <!-- Manual Search Box (Fallback jika QR rusak) -->
+        <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px;">
+          <label for="inputManualSearch">Cari Manual Siswa</label>
+          <input type="text" id="inputManualSearch" class="form-control" placeholder="Ketik nama / ID siswa (contoh: Yasmin, S001)">
+          <div id="studentSearchResults" class="student-search-results"></div>
+        </div>
+      </div>
+
+      <!-- Riwayat Absensi Sesi Ini -->
+      <div class="card">
+        <div class="attendance-history-title">
+          <h3 style="font-size: 1rem; color: var(--primary);">Kehadiran Sesi Ini</h3>
+          <span id="attendanceCount" style="font-weight: 700; font-size: 0.9rem;">0 Hadir</span>
+        </div>
+        <div id="attendanceList">
+          <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Belum ada siswa yang discan pada sesi ini.</p>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
