@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code Siswa untuk Tes Scan</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 { color: #1b5e20; }
+    p { color: #555; }
+    .grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+      margin-top: 25px;
+    }
+    .card {
+      background: #fff;
+      border: 2px solid #ddd;
+      border-radius: 12px;
+      padding: 20px;
+      width: 200px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.06);
+    }
+    .card img {
+      width: 160px;
+      height: 160px;
+      margin: 10px 0;
+    }
+    .id {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #1b5e20;
+    }
+    .name {
+      font-size: 0.95rem;
+      color: #333;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Contoh Kartu QR untuk Uji Scan</h1>
+  <p>Arahkan kamera HP kamu ke salah satu barcode di bawah ini untuk menguji scan:</p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="id">S001</div>
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=S001" alt="QR S001">
+      <div class="name">Siswa S001</div>
+    </div>
+
+    <div class="card">
+      <div class="id">S002</div>
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=S002" alt="QR S002">
+      <div class="name">Siswa S002</div>
+    </div>
+
+    <div class="card">
+      <div class="id">S003</div>
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=S003" alt="QR S003">
+      <div class="name">Siswa S003</div>
+    </div>
+
+    <div class="card">
+      <div class="id">S004</div>
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=S004" alt="QR S004">
+      <div class="name">Siswa S004</div>
+    </div>
+  </div>
+
+  <p style="margin-top: 30px;">
+    <a href="index.html" style="color: #1b5e20; font-weight: bold;">← Kembali ke Halaman Absensi</a>
+  </p>
+
+</body>
+</html>
