@@ -207,5 +207,18 @@ function deleteAttendance(body, namaPelatih) {
 }
 
 function getSessionAttendance(body) {
-  return jsonResponse(false, 'not_implemented', 'sessionAttendance akan tersedia di M3.', null);
+  var idSesi = body.idSesi;
+  if (!idSesi) {
+    return jsonResponse(false, 'invalid_input', 'ID Sesi wajib diisi.', null);
+  }
+  try {
+    var list = getAbsensiSesi(idSesi);
+    return jsonResponse(true, 'ok', 'Berhasil memuat absensi sesi.', {
+      idSesi: idSesi,
+      attendance: list
+    });
+  } catch (err) {
+    logError('getSessionAttendance error: ' + err.message);
+    return jsonResponse(false, 'server_error', 'Gagal memuat absensi sesi: ' + err.message, null);
+  }
 }

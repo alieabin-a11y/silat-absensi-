@@ -1,6 +1,6 @@
 /**
  * app.js — Logika Frontend Pelatih Absensi Silat Putra Setia Rawa Bebek
- * Milestone 2: Login Pelatih, Sesi Aktif, Scan Kamera QR, Feedback, Cari Manual.
+ * Milestone 2 & 3: Login Pelatih, Sesi Aktif, Scan Kamera QR, Feedback, Cari Manual, Pembayaran Lunas.
  */
 
 // URL Backend Google Apps Script Web App
@@ -23,6 +23,7 @@ let appData = {
 
 let html5QrCode = null;
 let isScannerRunning = false;
+let isProcessingScan = false;
 let lastScanned = { id: '', time: 0 };
 let sessionAttendanceList = []; // Daftar yang sudah discan di sesi aktif
 
@@ -296,9 +297,30 @@ function renderSessionInfo() {
   const isToday = tgl === appData.today;
   sessionMeta.textContent = `Tanggal: ${tgl} ${isToday ? '• Hari ini (WIB)' : '• ⚠️ Bukan hari ini'}`;
 
-  // Reset daftar kehadiran lokal untuk sesi baru
-  sessionAttendanceList = [];
-  renderAttendanceList();
+  // Ambil data absensi nyata dari Google Sheets untuk sesi ini
+  loadSessionAttendance(s.idSesi);
+}
+
+async function loadSessionAttendance(idSesi) {
+  attendanceList.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Memuat data kehadiran dari sheet...</p>';
+  try {
+    const res = await apiRequest('sessionAttendance', { idSesi: idSesi });
+    if (res.ok && res.data && res.data.attendance) {
+      // Hilangkan potensi duplikat ID di frontend
+      const uniqueMap = new Map();
+      res.data.attendance.forEach(item => {
+        uniqueMap.set(item.idSiswa, item);
+      });
+      sessionAttendanceList = Array.from(uniqueMap.values());
+      renderAttendanceList();
+    } else {
+      sessionAttendanceList = [];
+      renderAttendanceList();
+    }
+  } catch (err) {
+    console.error('Gagal mengambil kehadiran sesi:', err);
+    renderAttendanceList();
+  }
 }
 
 function populateSessionDropdown() {
@@ -399,10 +421,14 @@ function onScanSuccess(decodedText, decodedResult) {
 // ─────────────────────────────────────────────
 
 async function processScan(idSiswa, confirm = false) {
+  if (isProcessingScan) return; // Cegah double submit dari frontend
+  isProcessingScan = true;
+
   if (!appData.sesiAktif) {
     showFeedback('danger', 'Sesi Belum Dipilih', 'Pilih sesi aktif terlebih dahulu sebelum scan.');
     playChime('error');
     vibrate([200]);
+    isProcessingScan = false;
     return;
   }
 
@@ -412,6 +438,7 @@ async function processScan(idSiswa, confirm = false) {
     showFeedback('danger', 'QR Tidak Dikenali', `Format QR (${idSiswa}) tidak sesuai format ID Siswa (contoh: S001).`);
     playChime('error');
     vibrate([200]);
+    isProcessingScan = false;
     return;
   }
 
@@ -430,6 +457,8 @@ async function processScan(idSiswa, confirm = false) {
     showFeedback('danger', 'Koneksi Error', 'Gagal menghubungi server. Periksa jaringan internet.');
     playChime('error');
     vibrate([200]);
+  } finally {
+    isProcessingScan = false;
   }
 }
 
@@ -451,7 +480,7 @@ function handleScanResult(res, idSiswa) {
       }
     ]);
 
-    // Tambahkan ke riwayat tampilan
+    // Tambahkan atau perbarui di riwayat tampilan (tanpa duplikat)
     addAttendanceRecord(record);
     return;
   }
@@ -460,7 +489,13 @@ function handleScanResult(res, idSiswa) {
   if (res.code === 'duplicate') {
     playChime('duplicate');
     vibrate([100, 50, 100]);
-    showFeedback('duplicate', 'Sudah Hadir (Duplikat)', res.message);
+    showFeedback('duplicate', 'Sudah Hadir (Duplikat)', res.message, [
+      {
+        text: 'Tandai Lunas',
+        class: 'btn-success btn-sm',
+        onClick: () => markQuickPaid(appData.sesiAktif.idSesi, idSiswa)
+      }
+    ]);
     return;
   }
 
@@ -509,7 +544,7 @@ function handleScanResult(res, idSiswa) {
 }
 
 // ─────────────────────────────────────────────
-// Feedback UI Card
+// Feedback UI Card & Pembayaran
 // ─────────────────────────────────────────────
 
 function showFeedback(type, title, desc, actions = []) {
@@ -534,14 +569,46 @@ function hideFeedback() {
   feedbackCard.style.display = 'none';
 }
 
-function markQuickPaid(idSesi, idSiswa) {
-  // Update status lokal
-  const item = sessionAttendanceList.find(a => a.idSiswa === idSiswa);
-  if (item) {
-    item.statusBayar = 'Lunas';
-    renderAttendanceList();
+async function markQuickPaid(idSesi, idSiswa, customJumlah = null) {
+  showFeedback('warning', 'Menyimpan...', 'Memperbarui status bayar ke Google Sheets...');
+  try {
+    const res = await apiRequest('markPaid', {
+      idSesi: idSesi,
+      idSiswa: idSiswa,
+      metode: 'Tunai',
+      jumlah: customJumlah
+    });
+
+    if (res.ok) {
+      playChime('success');
+      vibrate([150]);
+      
+      // Update item di daftar kehadiran lokal
+      const item = sessionAttendanceList.find(a => a.idSiswa === idSiswa);
+      if (item) {
+        item.statusBayar = res.data.statusBayar;
+        item.jumlahDibayar = res.data.jumlahDibayar;
+        item.metode = res.data.metode;
+        item.tglBayar = res.data.tglBayar;
+        renderAttendanceList();
+      }
+      showFeedback('success', 'Status Lunas (Tunai)', `Pembayaran ${idSiswa} berhasil dicatat di Google Sheets.`);
+    } else {
+      showFeedback('danger', 'Gagal Update', res.message || 'Gagal mengubah status bayar.');
+    }
+  } catch (err) {
+    showFeedback('danger', 'Koneksi Error', 'Gagal menghubungi server untuk update pembayaran.');
   }
-  showFeedback('success', 'Status Lunas', `Kehadiran ${idSiswa} ditandai Lunas.`);
+}
+
+function promptMarkPaid(idSesi, idSiswa, nama, isPaid) {
+  if (isPaid) {
+    alert(`Siswa ${nama} (${idSiswa}) sudah berstatus LUNAS.`);
+    return;
+  }
+  if (confirm(`Tandai pembayaran ${nama} (${idSiswa}) sebagai LUNAS (Tunai)?`)) {
+    markQuickPaid(idSesi, idSiswa);
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -594,8 +661,13 @@ function handleManualSearch(e) {
 // ─────────────────────────────────────────────
 
 function addAttendanceRecord(record) {
-  // Sisipkan di posisi teratas
-  sessionAttendanceList.unshift(record);
+  // Cegah duplikasi di tampilan lokal
+  const existingIdx = sessionAttendanceList.findIndex(a => a.idSiswa === record.idSiswa);
+  if (existingIdx !== -1) {
+    sessionAttendanceList[existingIdx] = record;
+  } else {
+    sessionAttendanceList.unshift(record);
+  }
   renderAttendanceList();
 }
 
@@ -618,7 +690,9 @@ function renderAttendanceList() {
         <div class="attendance-time">${item.timestamp}</div>
       </div>
       <div>
-        <span class="badge-${isPaid ? 'paid' : 'unpaid'}">${item.statusBayar || 'Belum'}</span>
+        <button class="badge-${isPaid ? 'paid' : 'unpaid'}" style="cursor: pointer; border: none; font-family: inherit;" onclick="promptMarkPaid('${item.idSesi}', '${item.idSiswa}', '${item.nama}', ${isPaid})" title="Klik untuk ubah status bayar">
+          ${item.statusBayar || 'Belum'} ${isPaid ? '✓' : '✎'}
+        </button>
       </div>
     `;
     attendanceList.appendChild(el);
