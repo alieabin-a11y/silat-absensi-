@@ -100,6 +100,12 @@ silat-absensi/
 23. Semua timestamp menggunakan **WIB (Asia/Jakarta)**.
 24. Diatur di `appsscript.json`: `"timeZone": "Asia/Jakarta"`.
 
+### Integritas Kode & Prinsip Modifikasi (Surgical Edits)
+25. **CEK SEBELUM EDIT**: Selalu baca dan periksa kode yang ada terlebih dahulu sebelum melakukan perbaikan atau penambahan fitur.
+26. **JANGAN TIMPA MEMBABI-BUTA**: Lakukan *surgical edits* (modifikasi terarah hanya pada fungsi atau baris yang bermasalah). Jangan pernah me-rewrite atau menimpa seluruh file jika hanya bagian kecil yang diperbaiki.
+27. **BEBAS KODE MATI (NO DEAD CODE)**: Tidak boleh meninggalkan kode basi, fungsi mubazir yang tidak dipanggil, atau logika ganda yang membingungkan.
+28. **PRESERVE EXISTING LOGIC**: Pertahankan fungsi, variabel, dan komentar dokumentasi yang sudah berjalan baik agar perbaikan tidak memicu regresi (kerusakan sampingan).
+
 ---
 
 ## Sheet & Kolom (Referensi Cepat)
