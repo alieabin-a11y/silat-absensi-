@@ -23,6 +23,7 @@ let appData = {
 
 let html5QrCode = null;
 let isScannerRunning = false;
+let isScannerPaused = false;
 let isProcessingScan = false;
 let lastScanned = { id: '', time: 0 };
 let sessionAttendanceList = []; // Daftar yang sudah discan di sesi aktif
@@ -151,6 +152,14 @@ const studentSearchResults = document.getElementById('studentSearchResults');
 
 const attendanceCount = document.getElementById('attendanceCount');
 const attendanceList = document.getElementById('attendanceList');
+
+const scanModal = document.getElementById('scanModal');
+const modalIcon = document.getElementById('modalIcon');
+const modalTitle = document.getElementById('modalTitle');
+const modalStudentName = document.getElementById('modalStudentName');
+const modalStudentMeta = document.getElementById('modalStudentMeta');
+const modalStatusBadge = document.getElementById('modalStatusBadge');
+const modalActions = document.getElementById('modalActions');
 
 // ─────────────────────────────────────────────
 // Inisialisasi Aplikasi
@@ -444,7 +453,55 @@ function onScanFailure(error) {
   // Abaikan kegagalan scan per-frame (normal saat QR belum terdeteksi)
 }
 
+function pauseScanner() {
+  isScannerPaused = true;
+  if (html5QrCode && isScannerRunning) {
+    try {
+      html5QrCode.pause(true);
+    } catch (e) {
+      console.warn('Gagal pause camera:', e);
+    }
+  }
+}
+
+function resumeScanner() {
+  isScannerPaused = false;
+  closeScanModal();
+  if (html5QrCode && isScannerRunning) {
+    try {
+      html5QrCode.resume();
+    } catch (e) {
+      console.warn('Gagal resume camera:', e);
+    }
+  }
+}
+
+function openScanModal(icon, title, studentName, studentMeta, statusHtml, actions = []) {
+  modalIcon.textContent = icon;
+  modalTitle.textContent = title;
+  modalStudentName.textContent = studentName;
+  modalStudentMeta.textContent = studentMeta;
+  modalStatusBadge.innerHTML = statusHtml;
+
+  modalActions.innerHTML = '';
+  actions.forEach(act => {
+    const btn = document.createElement('button');
+    btn.className = `btn ${act.class || 'btn-secondary'}`;
+    btn.textContent = act.text;
+    btn.onclick = act.onClick;
+    modalActions.appendChild(btn);
+  });
+
+  scanModal.classList.remove('hidden');
+}
+
+function closeScanModal() {
+  scanModal.classList.add('hidden');
+}
+
 function onScanSuccess(decodedText, decodedResult) {
+  if (isScannerPaused || isProcessingScan) return; // Jeda kamera aktif, abaikan frame
+
   const scannedText = (decodedText || '').trim();
 
   // Cooldown scan 2 detik untuk ID yang sama persis
@@ -453,6 +510,9 @@ function onScanSuccess(decodedText, decodedResult) {
     return;
   }
   lastScanned = { id: scannedText, time: now };
+
+  // Jeda kamera seketika agar tidak scan berulang kali!
+  pauseScanner();
 
   processScan(scannedText);
 }
@@ -466,7 +526,13 @@ async function processScan(idSiswa, confirm = false) {
   isProcessingScan = true;
 
   if (!appData.sesiAktif) {
-    showFeedback('danger', 'Sesi Belum Dipilih', 'Pilih sesi aktif terlebih dahulu sebelum scan.');
+    openScanModal('⚠️', 'Sesi Belum Dipilih', '-', 'Silakan pilih sesi aktif terlebih dahulu sebelum scan.', '<span class="badge-unpaid">Sesi Kosong</span>', [
+      {
+        text: 'Tutup & Lanjut',
+        class: 'btn-secondary',
+        onClick: () => resumeScanner()
+      }
+    ]);
     playChime('error');
     vibrate([200]);
     isProcessingScan = false;
@@ -476,7 +542,13 @@ async function processScan(idSiswa, confirm = false) {
   // Validasi Regex ID Siswa
   const regex = /^S\d{3,}$/;
   if (!regex.test(idSiswa)) {
-    showFeedback('danger', 'QR Tidak Dikenali', `Format QR (${idSiswa}) tidak sesuai format ID Siswa (contoh: S001).`);
+    openScanModal('❌', 'QR Tidak Dikenali', `Format ID: ${idSiswa}`, 'Format QR tidak sesuai (contoh: S001).', '<span class="badge-unpaid">Bukan Kartu Siswa</span>', [
+      {
+        text: 'Tutup & Lanjut Scan',
+        class: 'btn-secondary',
+        onClick: () => resumeScanner()
+      }
+    ]);
     playChime('error');
     vibrate([200]);
     isProcessingScan = false;
@@ -495,7 +567,13 @@ async function processScan(idSiswa, confirm = false) {
     handleScanResult(res, idSiswa);
 
   } catch (err) {
-    showFeedback('danger', 'Koneksi Error', 'Gagal menghubungi server. Periksa jaringan internet.');
+    openScanModal('❌', 'Koneksi Error', `ID: ${idSiswa}`, 'Gagal menghubungi server. Periksa jaringan internet kamu.', '<span class="badge-unpaid">Koneksi Putus</span>', [
+      {
+        text: 'Tutup & Coba Lagi',
+        class: 'btn-secondary',
+        onClick: () => resumeScanner()
+      }
+    ]);
     playChime('error');
     vibrate([200]);
   } finally {
@@ -504,25 +582,46 @@ async function processScan(idSiswa, confirm = false) {
 }
 
 function handleScanResult(res, idSiswa) {
+  hideFeedback();
+
   // 1. Sukses Hadir
   if (res.ok && res.code === 'ok') {
     const record = res.data.record;
     const siswa = res.data.siswa;
     const displayName = siswa.panggilan ? `${siswa.nama} (${siswa.panggilan})` : siswa.nama;
+    const tarifText = record.tarif ? `Rp${Number(record.tarif).toLocaleString('id-ID')}` : 'Rp15.000';
 
     playChime('success');
     vibrate([150]);
 
-    showFeedback('success', `${displayName}, Hadir!`, `Berhasil dicatat pada ${record.timestamp}`, [
-      {
-        text: 'Lunas (Tunai)',
-        class: 'btn-success btn-sm',
-        onClick: () => markQuickPaid(record.idSesi, record.idSiswa)
-      }
-    ]);
-
-    // Tambahkan atau perbarui di riwayat tampilan (tanpa duplikat)
+    // Tambahkan ke riwayat tampilan
     addAttendanceRecord(record);
+
+    // Tampilkan Pop-up Pembayaran & Jeda Kamera
+    openScanModal(
+      '✅',
+      'Kehadiran Tercatat!',
+      displayName,
+      `ID: ${record.idSiswa} • Jam: ${record.timestamp}`,
+      `<span class="badge-unpaid">Status: Belum Lunas</span>`,
+      [
+        {
+          text: `💰 Bayar Lunas (Tunai ${tarifText})`,
+          class: 'btn-success',
+          onClick: async () => {
+            await markQuickPaid(record.idSesi, record.idSiswa);
+            resumeScanner();
+          }
+        },
+        {
+          text: '📋 Belum Bayar (Lanjut Scan)',
+          class: 'btn-secondary',
+          onClick: () => {
+            resumeScanner();
+          }
+        }
+      ]
+    );
     return;
   }
 
@@ -530,13 +629,39 @@ function handleScanResult(res, idSiswa) {
   if (res.code === 'duplicate') {
     playChime('duplicate');
     vibrate([100, 50, 100]);
-    showFeedback('duplicate', 'Sudah Hadir (Duplikat)', res.message, [
-      {
-        text: 'Tandai Lunas',
-        class: 'btn-success btn-sm',
-        onClick: () => markQuickPaid(appData.sesiAktif.idSesi, idSiswa)
+
+    const existing = sessionAttendanceList.find(a => a.idSiswa === idSiswa);
+    const isPaid = existing && existing.statusBayar === 'Lunas';
+    const studentName = existing ? existing.nama : (res.data.nama || idSiswa);
+    const jamHadir = res.data.timestamp || (existing ? existing.timestamp : '-');
+
+    const actions = [];
+    if (!isPaid) {
+      actions.push({
+        text: '💰 Tandai Lunas Sekarang',
+        class: 'btn-success',
+        onClick: async () => {
+          await markQuickPaid(appData.sesiAktif.idSesi, idSiswa);
+          resumeScanner();
+        }
+      });
+    }
+    actions.push({
+      text: 'Tutup & Lanjut Scan',
+      class: 'btn-secondary',
+      onClick: () => {
+        resumeScanner();
       }
-    ]);
+    });
+
+    openScanModal(
+      '⚠️',
+      'Sudah Hadir (Duplikat)',
+      studentName,
+      `Siswa sudah discan pada jam: ${jamHadir}`,
+      isPaid ? `<span class="badge-paid">Status: Lunas ✓</span>` : `<span class="badge-unpaid">Status: Belum Lunas ✎</span>`,
+      actions
+    );
     return;
   }
 
@@ -544,18 +669,29 @@ function handleScanResult(res, idSiswa) {
   if (res.code === 'inactive') {
     playChime('duplicate');
     vibrate([100, 50, 100]);
-    showFeedback('warning', 'Siswa Nonaktif', res.message, [
-      {
-        text: 'Tetap Lanjutkan',
-        class: 'btn-danger btn-sm',
-        onClick: () => processScan(idSiswa, true)
-      },
-      {
-        text: 'Batal',
-        class: 'btn-secondary btn-sm',
-        onClick: () => hideFeedback()
-      }
-    ]);
+
+    openScanModal(
+      '⚠️',
+      'Siswa Nonaktif',
+      `${res.data.nama || idSiswa}`,
+      'Siswa ini berstatus Nonaktif di database.',
+      `<span class="badge-unpaid">Perlu Konfirmasi</span>`,
+      [
+        {
+          text: 'Tetap Hadirkan',
+          class: 'btn-danger',
+          onClick: () => {
+            closeScanModal();
+            processScan(idSiswa, true);
+          }
+        },
+        {
+          text: 'Batal (Lanjut Scan)',
+          class: 'btn-secondary',
+          onClick: () => resumeScanner()
+        }
+      ]
+    );
     return;
   }
 
@@ -563,25 +699,50 @@ function handleScanResult(res, idSiswa) {
   if (res.code === 'not_khusus_participant') {
     playChime('duplicate');
     vibrate([100, 50, 100]);
-    showFeedback('warning', 'Bukan Peserta Khusus', res.message, [
-      {
-        text: 'Tetap Catat',
-        class: 'btn-primary btn-sm',
-        onClick: () => processScan(idSiswa, true)
-      },
-      {
-        text: 'Batal',
-        class: 'btn-secondary btn-sm',
-        onClick: () => hideFeedback()
-      }
-    ]);
+
+    openScanModal(
+      '⚠️',
+      'Bukan Peserta Khusus',
+      `${res.data.nama || idSiswa}`,
+      'Siswa ini tidak terdaftar dalam daftar Turnamen Khusus.',
+      `<span class="badge-unpaid">Perlu Konfirmasi</span>`,
+      [
+        {
+          text: 'Tetap Catat Kehadiran',
+          class: 'btn-primary',
+          onClick: () => {
+            closeScanModal();
+            processScan(idSiswa, true);
+          }
+        },
+        {
+          text: 'Batal (Lanjut Scan)',
+          class: 'btn-secondary',
+          onClick: () => resumeScanner()
+        }
+      ]
+    );
     return;
   }
 
   // 5. Error Lainnya (Siswa Tidak Ada, Sesi Batal, dsb)
   playChime('error');
   vibrate([250]);
-  showFeedback('danger', 'Scan Ditolak', res.message || 'Terjadi kesalahan pada scan.');
+
+  openScanModal(
+    '❌',
+    'Scan Ditolak',
+    `ID: ${idSiswa}`,
+    res.message || 'Terjadi kesalahan saat memproses scan.',
+    `<span class="badge-unpaid">Ditolak</span>`,
+    [
+      {
+        text: 'Tutup & Lanjut Scan',
+        class: 'btn-secondary',
+        onClick: () => resumeScanner()
+      }
+    ]
+  );
 }
 
 // ─────────────────────────────────────────────
@@ -689,6 +850,7 @@ function handleManualSearch(e) {
     item.onclick = () => {
       studentSearchResults.style.display = 'none';
       inputManualSearch.value = '';
+      pauseScanner();
       processScan(s.idSiswa);
     };
     studentSearchResults.appendChild(item);
