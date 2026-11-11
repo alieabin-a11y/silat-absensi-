@@ -357,29 +357,66 @@ function handleSessionChange(e) {
 // Kamera & Scanner QR
 // ─────────────────────────────────────────────
 
-function startCamera() {
+async function startCamera() {
   if (isScannerRunning) return;
 
-  html5QrCode = new Html5Qrcode('reader');
-  const config = {
-    fps: 10,
-    qrbox: { width: 250, height: 250 },
-    aspectRatio: 1.0
-  };
+  btnToggleCamera.textContent = 'Memulai Kamera...';
 
-  html5QrCode.start(
-    { facingMode: 'environment' }, // Kamera belakang
-    config,
-    onScanSuccess,
-    onScanFailure
-  ).then(() => {
+  try {
+    if (!html5QrCode) {
+      html5QrCode = new Html5Qrcode('reader');
+    }
+
+    const config = {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1.0
+    };
+
+    // Deteksi kamera perangkat: pilih kamera belakang
+    let cameraMode = { facingMode: 'environment' };
+    try {
+      const devices = await Html5Qrcode.getCameras();
+      if (devices && devices.length > 0) {
+        const backCam = devices.find(d => /back|rear|environment|belakang/i.test(d.label)) || devices[devices.length - 1];
+        if (backCam && backCam.id) {
+          cameraMode = backCam.id;
+        }
+      }
+    } catch (e) {
+      console.warn('Deteksi getCameras gagal, fallback ke facingMode:', e);
+    }
+
+    await html5QrCode.start(
+      cameraMode,
+      config,
+      onScanSuccess,
+      onScanFailure
+    );
+
     isScannerRunning = true;
     btnToggleCamera.textContent = 'Jeda Kamera';
-  }).catch(err => {
+
+  } catch (err) {
     console.error('Kamera gagal dimulai:', err);
+    isScannerRunning = false;
     btnToggleCamera.textContent = 'Nyalakan Kamera';
-    showFeedback('danger', 'Kamera Tidak Tersedia', 'Izin kamera ditolak atau tidak didukung di perangkat ini. Gunakan kotak cari manual di bawah.');
-  });
+
+    // Coba fallback dengan generic constraint jika perangkat tertentu rewel
+    try {
+      await html5QrCode.start(
+        { facingMode: 'user' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onScanSuccess,
+        onScanFailure
+      );
+      isScannerRunning = true;
+      btnToggleCamera.textContent = 'Jeda Kamera';
+    } catch (fallbackErr) {
+      console.error('Fallback kamera juga gagal:', fallbackErr);
+      showFeedback('warning', 'Kamera Tidak Menyala', 'Pastikan izin kamera sudah diizinkan di browser Chrome/Safari kamu, lalu klik tombol "Nyalakan Kamera" di atas.');
+    }
+  }
 }
 
 function stopCamera() {
@@ -387,7 +424,11 @@ function stopCamera() {
     html5QrCode.stop().then(() => {
       isScannerRunning = false;
       btnToggleCamera.textContent = 'Nyalakan Kamera';
-    }).catch(err => console.error('Gagal stop kamera', err));
+    }).catch(err => {
+      console.error('Gagal stop kamera', err);
+      isScannerRunning = false;
+      btnToggleCamera.textContent = 'Nyalakan Kamera';
+    });
   }
 }
 
