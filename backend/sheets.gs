@@ -254,13 +254,14 @@ function findAbsensiRow(idSesi, idSiswa) {
   var lastRow = getLastDataRow(sheet, 'A');
   if (lastRow === 0) return { found: false };
 
-  var data = sheet.getRange(2, 1, lastRow, 3).getValues(); // A, B, C saja
+  var data = sheet.getRange(2, 1, lastRow, 3).getValues(); // A=Timestamp, B=ID_Sesi, C=ID_Siswa
   for (var i = 0; i < data.length; i++) {
     if (String(data[i][1]).trim() === idSesi && String(data[i][2]).trim() === idSiswa) {
       return {
         found: true,
         rowIndex: i + 2, // +2: baris data mulai di baris 2 sheet
-        sheetRow: i + 2
+        sheetRow: i + 2,
+        timestamp: data[i][0] ? formatTimestampWIB(data[i][0]) : ''
       };
     }
   }

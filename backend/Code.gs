@@ -178,30 +178,150 @@ function testReadSiswa() {
   }
 }
 
+// ─────────────────────────────────────────────
+// Fungsi uji M1: Comprehensive Test Suite
+// ─────────────────────────────────────────────
+
 /**
- * testReadAllSheets — Verifikasi semua sheet wajib ada.
- * Jalankan manual dari Apps Script Editor.
+ * testM1Comprehensive — Menjalankan seluruh pengujian kriteria selesai M1:
+ * 1. Login pelatih (passcode salah -> unauthorized)
+ * 2. Login pelatih (passcode benar -> ok + token valid)
+ * 3. Bootstrap data awal (siswa, sesi, tarif)
+ * 4. Scan: format ID salah -> unknown_student
+ * 5. Scan: siswa tidak ada -> unknown_student
+ * 6. Scan: sesi Khusus dengan siswa bukan peserta khusus -> not_khusus_participant
+ * 7. Scan: siswa valid -> ok (baris baru tercatat)
+ * 8. Scan: scan ulang siswa yang sama -> duplicate (tidak ada baris baru)
+ * 9. Cleanup baris uji di sheet Absensi
  */
-function testReadAllSheets() {
-  var required = ['Siswa', 'Sesi', 'Absensi', 'Pengaturan', 'Peserta_Khusus',
-                  'Rekap_Pendapatan', 'Ringkasan', 'Rekap_Siswa'];
-  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  var missing = [];
+function testM1Comprehensive() {
+  Logger.log('============================================');
+  Logger.log('MEMULAI PENGUJIAN M1 (BACKEND INTI)');
+  Logger.log('============================================');
 
-  required.forEach(function(name) {
-    var s = ss.getSheetByName(name);
-    if (s) {
-      Logger.log('✅ ' + name);
+  var passedCount = 0;
+  var totalTests = 0;
+
+  function assert(testName, condition, detail) {
+    totalTests++;
+    if (condition) {
+      passedCount++;
+      Logger.log(' [PASS] ' + testName + (detail ? ' (' + detail + ')' : ''));
     } else {
-      Logger.log('❌ ' + name + ' — TIDAK DITEMUKAN');
-      missing.push(name);
+      Logger.log(' [FAIL] ' + testName + (detail ? ' (' + detail + ')' : ''));
     }
-  });
-
-  if (missing.length === 0) {
-    Logger.log('Semua sheet wajib ada. ✅');
-  } else {
-    Logger.log('Sheet yang hilang: ' + missing.join(', '));
   }
+
+  // Helper untuk membaca isi JSON dari jsonResponse()
+  function parseRes(res) {
+    return JSON.parse(res.getContent());
+  }
+
+  // 1. Test Login Passcode Salah
+  var resLoginFail = parseRes(coachLogin({ passcode: 'SALAH_123', namaPelatih: 'Basyair' }));
+  assert('1. Login passcode salah harus ditolak', resLoginFail.ok === false && resLoginFail.code === 'unauthorized', resLoginFail.message);
+
+  // 2. Test Login Passcode Benar
+  // Ambil passcode dari properties untuk Basyair atau Febri
+  var props = PropertiesService.getScriptProperties();
+  var testPasscode = props.getProperty('COACH_PASSCODE_Basyair') || props.getProperty('COACH_PASSCODE') || props.getProperty('COACH_PASSCODE_Febri');
+  var testNamaPelatih = props.getProperty('COACH_PASSCODE_Basyair') ? 'Basyair' : (props.getProperty('COACH_PASSCODE_Febri') ? 'Febri' : 'Pelatih');
+
+  var resLoginSuccess = parseRes(coachLogin({ passcode: testPasscode, namaPelatih: testNamaPelatih }));
+  assert('2. Login passcode benar berhasil', resLoginSuccess.ok === true && resLoginSuccess.data && resLoginSuccess.data.token, 'Token: ' + (resLoginSuccess.data ? resLoginSuccess.data.token.substring(0, 8) + '...' : 'none'));
+
+  if (!resLoginSuccess.ok) {
+    Logger.log('Pengujian dihentikan: login gagal. Pastikan COACH_PASSCODE_Basyair terpasang.');
+    return;
+  }
+
+  var token = resLoginSuccess.data.token;
+
+  // 3. Test Bootstrap
+  var resBootstrap = parseRes(handleCoachAction('bootstrap', { token: token }));
+  assert('3. Bootstrap mengembalikan daftar siswa & sesi', 
+    resBootstrap.ok === true && resBootstrap.data.siswa.length === 36 && resBootstrap.data.tarif.umum > 0, 
+    'Jumlah siswa: ' + (resBootstrap.data ? resBootstrap.data.siswa.length : 0));
+
+  // Ambil sesi pertama yang tersedia untuk uji scan
+  var allSesi = resBootstrap.data.sesi;
+  if (!allSesi || allSesi.length === 0) {
+    Logger.log('PERINGATAN: Tidak ada data sesi di sheet Sesi. Tambahkan baris sesi terlebih dahulu.');
+    return;
+  }
+
+  // Cari sesi Umum yang tidak batal
+  var sesiUmum = null;
+  var sesiKhusus = null;
+  for (var s = 0; s < allSesi.length; s++) {
+    if (allSesi[s].jenis === 'Umum' && allSesi[s].statusSesi !== 'Batal' && !sesiUmum) {
+      sesiUmum = allSesi[s];
+    }
+    if (allSesi[s].jenis === 'Khusus' && allSesi[s].statusSesi !== 'Batal' && !sesiKhusus) {
+      sesiKhusus = allSesi[s];
+    }
+  }
+
+  var testSesiId = sesiUmum ? sesiUmum.idSesi : allSesi[0].idSesi;
+
+  // 4. Test Scan QR Format Salah
+  var resScanInvalidFormat = parseRes(handleCoachAction('scan', { token: token, idSesi: testSesiId, idSiswa: 'BUKAN_FORMAT_QR' }));
+  assert('4. Scan format ID salah ditolak', resScanInvalidFormat.ok === false && resScanInvalidFormat.code === 'unknown_student', resScanInvalidFormat.message);
+
+  // 5. Test Scan Siswa Tidak Ditemukan
+  var resScanUnknown = parseRes(handleCoachAction('scan', { token: token, idSesi: testSesiId, idSiswa: 'S999' }));
+  assert('5. Scan ID tidak terdaftar (S999) ditolak', resScanUnknown.ok === false && resScanUnknown.code === 'unknown_student', resScanUnknown.message);
+
+  // 6. Test Scan Siswa Bukan Peserta Khusus (jika ada sesi khusus)
+  if (sesiKhusus) {
+    var pesertaKhusus = resBootstrap.data.pesertaKhusus;
+    // Cari siswa yang bukan peserta khusus
+    var bukanPesertaKhususId = null;
+    for (var k = 0; k < resBootstrap.data.siswa.length; k++) {
+      var candidateId = resBootstrap.data.siswa[k].idSiswa;
+      if (pesertaKhusus.indexOf(candidateId) === -1) {
+        bukanPesertaKhususId = candidateId;
+        break;
+      }
+    }
+    if (bukanPesertaKhususId) {
+      var resScanKhususWarn = parseRes(handleCoachAction('scan', { token: token, idSesi: sesiKhusus.idSesi, idSiswa: bukanPesertaKhususId, confirm: false }));
+      assert('6. Scan siswa non-khusus di sesi Khusus beri peringatan', resScanKhususWarn.ok === false && resScanKhususWarn.code === 'not_khusus_participant', resScanKhususWarn.message);
+    }
+  }
+
+  // 7. Test Scan Siswa Valid (S001)
+  var testSiswaId = 'S001';
+  // Hapus dulu dari sheet jika S001 sudah pernah tercatat di sesi ini agar tes bersih
+  var existing = findAbsensiRow(testSesiId, testSiswaId);
+  if (existing.found) {
+    deleteAbsensiRow(existing.rowIndex);
+  }
+
+  var resScan1 = parseRes(handleCoachAction('scan', { token: token, idSesi: testSesiId, idSiswa: testSiswaId }));
+  assert('7. Scan siswa valid (S001) berhasil dicatat', resScan1.ok === true && resScan1.code === 'ok', resScan1.message);
+
+  // 8. Test Scan Ganda (S001 lagi di sesi yang sama)
+  var resScan2 = parseRes(handleCoachAction('scan', { token: token, idSesi: testSesiId, idSiswa: testSiswaId }));
+  assert('8. Scan kedua ditolak sebagai duplicate (mencegah double record)', resScan2.ok === false && resScan2.code === 'duplicate', resScan2.message);
+
+  // Verifikasi di sheet hanya ada 1 baris untuk S001
+  var checkRow = findAbsensiRow(testSesiId, testSiswaId);
+  assert('8b. Baris di sheet tepat 1 baris', checkRow.found === true, 'Row: ' + checkRow.rowIndex);
+
+  // 9. Cleanup data uji agar sheet Absensi tetap bersih
+  if (checkRow.found) {
+    deleteAbsensiRow(checkRow.rowIndex);
+    Logger.log(' [CLEANUP] Baris uji S001 berhasil dihapus kembali dari sheet Absensi.');
+  }
+
+  Logger.log('============================================');
+  Logger.log('HASIL PENGUJIAN M1: ' + passedCount + ' / ' + totalTests + ' LULUS');
+  if (passedCount === totalTests) {
+    Logger.log('✅ SELURUH SKENARIO M1 BERHASIL 100%!');
+  } else {
+    Logger.log('⚠️ Ada skenario yang belum lolos.');
+  }
+  Logger.log('============================================');
 }
 

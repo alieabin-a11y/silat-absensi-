@@ -43,10 +43,15 @@ function coachLogin(body) {
 
   // Ambil passcode dari Script Properties (bukan dari kode)
   var props = PropertiesService.getScriptProperties();
-  var storedPasscode = props.getProperty('COACH_PASSCODE');
+  
+  // Dukung passcode spesifik per pelatih (misal COACH_PASSCODE_Basyair) atau passcode umum COACH_PASSCODE
+  var cleanName = namaPelatih.trim().replace(/\s+/g, '_');
+  var specificPasscode = props.getProperty('COACH_PASSCODE_' + cleanName) || props.getProperty('COACH_PASSCODE_' + namaPelatih.trim());
+  var defaultPasscode = props.getProperty('COACH_PASSCODE');
+  var storedPasscode = specificPasscode || defaultPasscode;
 
   if (!storedPasscode) {
-    logError('COACH_PASSCODE belum diset di Script Properties.');
+    logError('Passcode untuk pelatih "' + cleanName + '" maupun COACH_PASSCODE belum diset di Script Properties.');
     return jsonResponse(false, 'server_error', 'Konfigurasi server belum lengkap. Hubungi administrator.', null);
   }
 
