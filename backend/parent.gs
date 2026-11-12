@@ -74,6 +74,14 @@ function parentView(body) {
       }
     });
 
+    // Catat sesi mana saja yang sudah pernah ada aktivitas absensi (sudah berjalan)
+    var sessionsWithAttendance = {};
+    allAbsensi.forEach(function(a) {
+      if (a.idSesi) {
+        sessionsWithAttendance[a.idSesi] = true;
+      }
+    });
+
     var totalSesiUmum = 0;
     var hadirUmum = 0;
     var totalSesiKhusus = 0;
@@ -81,21 +89,25 @@ function parentView(body) {
 
     var riwayat = [];
 
-    // Filter sesi yang relevan (bukan Batal, dan tanggal efektif sudah lewat atau hari ini atau ada catatan hadir)
+    // Filter sesi yang relevan (bukan Batal, dan sudah terlaksana / lewat / ada absensi)
     allSesi.forEach(function(s) {
       if (s.statusSesi === 'Batal') return;
 
       var tgl = s.tglEfektif || s.tglRencana;
       var hasAttendance = !!absensiMap[s.idSesi];
       var isPastOrToday = tgl && tgl <= today;
+      var hasAnyAttendance = !!sessionsWithAttendance[s.idSesi];
+
+      // Sesi dianggap sudah berjalan jika: tanggal sudah lewat/hari ini, status Terlaksana, atau sudah ada absensi
+      var sessionTookPlace = isPastOrToday || s.statusSesi === 'Terlaksana' || hasAnyAttendance || hasAttendance;
 
       // Lewati sesi khusus jika siswa bukan peserta khusus dan tidak pernah hadir di sesi tsb
       if (s.jenis === 'Khusus' && !isPesertaKhusus && !hasAttendance) {
         return;
       }
 
-      // Hitung statistik sesi yang sudah terlaksana atau hari ini
-      if (isPastOrToday || s.statusSesi === 'Terlaksana') {
+      // Hitung statistik sesi yang sudah berjalan
+      if (sessionTookPlace) {
         if (s.jenis === 'Umum') {
           totalSesiUmum++;
           if (hasAttendance && absensiMap[s.idSesi].statusHadir === 'Hadir') {
@@ -110,7 +122,7 @@ function parentView(body) {
       }
 
       // Masukkan ke riwayat jika sesi sudah berjalan atau sudah ada absensinya
-      if (isPastOrToday || hasAttendance) {
+      if (sessionTookPlace || hasAttendance) {
         var rec = absensiMap[s.idSesi];
         var statusHadir = rec ? rec.statusHadir : 'Tidak tercatat';
         var statusBayar = rec ? rec.statusBayar : '-';

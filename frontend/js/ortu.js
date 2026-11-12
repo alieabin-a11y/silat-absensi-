@@ -164,10 +164,17 @@ function renderParentPortal(data) {
 
   // Statistik Kehadiran
   const stat = data.statistik;
-  const percent = stat.kehadiranUmumPersen || 0;
-  displayPercentText.textContent = `${percent}%`;
-  displayHadirRatio.textContent = `${stat.hadirUmum} dari ${stat.totalSesiUmum} sesi`;
-  progressFillBar.style.width = `${percent}%`;
+  const totalUmum = stat.totalSesiUmum || 0;
+  if (totalUmum > 0) {
+    const percent = stat.kehadiranUmumPersen || 0;
+    displayPercentText.textContent = `${percent}%`;
+    displayHadirRatio.textContent = `${stat.hadirUmum} dari ${totalUmum} sesi`;
+    progressFillBar.style.width = `${percent}%`;
+  } else {
+    displayPercentText.textContent = '-';
+    displayHadirRatio.textContent = 'Belum ada sesi latihan umum';
+    progressFillBar.style.width = '0%';
+  }
 
   statHadirUmum.textContent = `${stat.hadirUmum} Kali`;
   statHadirKhusus.textContent = `${stat.hadirKhusus} Kali`;
@@ -221,3 +228,4 @@ function renderParentPortal(data) {
     parentSessionList.appendChild(el);
   });
 }
+
