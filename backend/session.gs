@@ -68,6 +68,86 @@ function updateSession(body, namaPelatih) {
   }
 }
 
+/**
+ * Aksi: createSessions / createSession
+ * Params: { tanggal, jenis, tarif?, keterangan? }
+ *
+ * Buat sesi baru langsung dari dashboard pelatih tanpa buka Google Sheets.
+ * Return data sesi baru yang baru dibuat.
+ */
 function createSessions(body, namaPelatih) {
-  return jsonResponse(false, 'not_implemented', 'createSessions akan tersedia di M4 (P1).', null);
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (e) {
+    return jsonResponse(false, 'server_busy', 'Sistem sedang sibuk, coba beberapa saat lagi.', null);
+  }
+
+  try {
+    var tanggal = body.tanggal || body.tglRencana;
+    if (!tanggal || !/^\d{4}-\d{2}-\d{2}$/.test(String(tanggal).trim())) {
+      return jsonResponse(false, 'invalid_input', 'Format tanggal wajib YYYY-MM-DD.', null);
+    }
+    tanggal = String(tanggal).trim();
+
+    var jenis = body.jenis ? String(body.jenis).trim() : 'Umum';
+    var validJenis = ['Umum', 'Khusus', 'Ujian'];
+    if (validJenis.indexOf(jenis) === -1) {
+      return jsonResponse(false, 'invalid_input', 'Jenis sesi harus: ' + validJenis.join(', '), null);
+    }
+
+    var tarif = 5000;
+    if (body.tarif !== undefined && body.tarif !== null && String(body.tarif).trim() !== '') {
+      tarif = Number(body.tarif);
+      if (isNaN(tarif) || tarif < 0) {
+        return jsonResponse(false, 'invalid_input', 'Tarif harus berupa angka positif.', null);
+      }
+    } else {
+      if (jenis === 'Khusus') tarif = 10000;
+      else if (jenis === 'Ujian') tarif = 15000;
+      else tarif = 5000;
+    }
+
+    var keterangan = body.keterangan ? String(body.keterangan).trim() : ('Latihan ' + jenis);
+
+    // Generate ID Sesi unik: SESI-YYYY-MM-DD-U / SESI-YYYY-MM-DD-K / SESI-YYYY-MM-DD-UJ
+    var suffix = 'U';
+    if (jenis === 'Khusus') suffix = 'K';
+    else if (jenis === 'Ujian') suffix = 'UJ';
+
+    var baseId = 'SESI-' + tanggal + '-' + suffix;
+    var finalId = baseId;
+    var counter = 1;
+
+    // Pastikan ID unik
+    while (getSesiById(finalId)) {
+      counter++;
+      finalId = baseId + counter;
+    }
+
+    var rowData = {
+      idSesi: finalId,
+      tglRencana: tanggal,
+      tglAktual: '',
+      jenis: jenis,
+      statusSesi: 'Terjadwal',
+      tarif: tarif,
+      keterangan: keterangan
+    };
+
+    appendSesi(rowData);
+    logInfo('createSession: ' + finalId + ' (' + jenis + ', Rp ' + tarif + ') oleh ' + namaPelatih);
+
+    var sesiBaru = getSesiById(finalId);
+    return jsonResponse(true, 'ok', 'Sesi ' + finalId + ' berhasil dibuat.', {
+      sesi: sesiBaru
+    });
+
+  } catch (err) {
+    logError('createSession error: ' + err.message);
+    return jsonResponse(false, 'server_error', 'Gagal membuat sesi: ' + err.message, null);
+  } finally {
+    lock.releaseLock();
+  }
 }
+

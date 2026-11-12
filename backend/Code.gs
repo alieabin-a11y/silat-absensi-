@@ -100,6 +100,7 @@ function handleCoachAction(action, body) {
     case 'markPaid':        return markPaid(body, tokenCheck.namaPelatih);
     case 'sessionAttendance': return getSessionAttendance(body);
     case 'updateSession':   return updateSession(body, tokenCheck.namaPelatih);
+    case 'createSession':
     case 'createSessions':  return createSessions(body, tokenCheck.namaPelatih);
     case 'revenueMonth':    return getRevenueMonth(body);
     case 'debtors':         return getDebtors(body);

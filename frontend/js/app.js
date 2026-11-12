@@ -195,6 +195,15 @@ const editSessionKeterangan = document.getElementById('editSessionKeterangan');
 const btnSaveSessionEdit = document.getElementById('btnSaveSessionEdit');
 const btnCancelSessionEdit = document.getElementById('btnCancelSessionEdit');
 
+const btnOpenCreateSessionModal = document.getElementById('btnOpenCreateSessionModal');
+const createSessionModal = document.getElementById('createSessionModal');
+const newSessionDate = document.getElementById('newSessionDate');
+const newSessionJenis = document.getElementById('newSessionJenis');
+const newSessionTarif = document.getElementById('newSessionTarif');
+const newSessionKeterangan = document.getElementById('newSessionKeterangan');
+const btnSaveNewSession = document.getElementById('btnSaveNewSession');
+const btnCancelNewSession = document.getElementById('btnCancelNewSession');
+
 // ─────────────────────────────────────────────
 // Inisialisasi Aplikasi
 // ─────────────────────────────────────────────
@@ -226,6 +235,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnRefreshSessions) btnRefreshSessions.addEventListener('click', () => renderSessionsManage());
   if (btnSaveSessionEdit) btnSaveSessionEdit.addEventListener('click', handleSaveSessionEdit);
   if (btnCancelSessionEdit) btnCancelSessionEdit.addEventListener('click', closeSessionEditModal);
+  if (btnOpenCreateSessionModal) btnOpenCreateSessionModal.addEventListener('click', openCreateSessionModal);
+  if (btnCancelNewSession) btnCancelNewSession.addEventListener('click', closeCreateSessionModal);
+  if (btnSaveNewSession) btnSaveNewSession.addEventListener('click', handleSaveNewSession);
+  if (newSessionJenis) newSessionJenis.addEventListener('change', handleNewSessionJenisChange);
 });
 
 // ─────────────────────────────────────────────
@@ -1389,3 +1402,95 @@ async function handleSaveSessionEdit() {
     btnSaveSessionEdit.textContent = 'Simpan Perubahan';
   }
 }
+
+// ─────────────────────────────────────────────
+// Buat Sesi Baru (Create Session)
+// ─────────────────────────────────────────────
+
+function openCreateSessionModal() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  if (newSessionDate) newSessionDate.value = `${yyyy}-${mm}-${dd}`;
+  if (newSessionJenis) newSessionJenis.value = 'Umum';
+  if (newSessionTarif) newSessionTarif.value = 5000;
+  if (newSessionKeterangan) newSessionKeterangan.value = 'Latihan Rutin Umum';
+  if (createSessionModal) createSessionModal.classList.remove('hidden');
+}
+
+function closeCreateSessionModal() {
+  if (createSessionModal) createSessionModal.classList.add('hidden');
+}
+
+function handleNewSessionJenisChange() {
+  const jenis = newSessionJenis.value;
+  if (jenis === 'Khusus') {
+    newSessionTarif.value = 10000;
+    newSessionKeterangan.value = 'Latihan Khusus';
+  } else if (jenis === 'Ujian') {
+    newSessionTarif.value = 15000;
+    newSessionKeterangan.value = 'Ujian Kenaikan Tingkat';
+  } else {
+    newSessionTarif.value = 5000;
+    newSessionKeterangan.value = 'Latihan Rutin Umum';
+  }
+}
+
+async function handleSaveNewSession() {
+  const tanggal = newSessionDate.value.trim();
+  const jenis = newSessionJenis.value;
+  const tarif = parseInt(newSessionTarif.value, 10) || 0;
+  const keterangan = newSessionKeterangan.value.trim();
+
+  if (!tanggal) {
+    alert('Tanggal sesi wajib dipilih.');
+    return;
+  }
+
+  btnSaveNewSession.disabled = true;
+  btnSaveNewSession.textContent = 'Membuat Sesi...';
+
+  try {
+    const res = await apiRequest('createSession', {
+      tanggal: tanggal,
+      jenis: jenis,
+      tarif: tarif,
+      keterangan: keterangan
+    });
+
+    if (res.ok && res.data && res.data.sesi) {
+      playChime('success');
+      const newSesi = res.data.sesi;
+
+      // Masukkan sesi baru ke state aplikasi
+      appData.sesi.push(newSesi);
+
+      // Urutkan berdasarkan tanggal & id
+      appData.sesi.sort((a, b) => (b.tglEfektif || b.tglRencana).localeCompare(a.tglEfektif || a.tglRencana));
+
+      // Re-render dropdown sesi di Tab Presensi
+      renderSessionSelector();
+
+      // Jika belum ada sesi aktif, jadikan sesi baru ini sebagai sesi aktif
+      if (!appData.sesiAktif) {
+        appData.sesiAktif = newSesi;
+        renderSessionInfo();
+      }
+
+      // Re-render daftar kelola sesi
+      renderSessionsManage();
+
+      closeCreateSessionModal();
+      showFeedback('success', 'Sesi Baru Dibuat', `Sesi ${newSesi.idSesi} (${newSesi.jenis}) berhasil ditambahkan ke jadwal.`);
+    } else {
+      alert(res.message || 'Gagal membuat sesi baru.');
+    }
+  } catch (err) {
+    alert('Koneksi gagal saat membuat sesi.');
+  } finally {
+    btnSaveNewSession.disabled = false;
+    btnSaveNewSession.textContent = 'Simpan Sesi';
+  }
+}
+

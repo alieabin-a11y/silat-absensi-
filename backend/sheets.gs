@@ -419,3 +419,32 @@ function updateSesiRow(idSesi, updates) {
   return true;
 }
 
+/**
+ * Tambah baris sesi baru ke sheet Sesi.
+ * Harus dipanggil di dalam LockService.
+ * @returns {number} Nomor baris baru di sheet.
+ */
+function appendSesi(row) {
+  var sheet = getSpreadsheet().getSheetByName(SHEET_SESI);
+  var lastDataRow = getLastDataRow(sheet, 'A');
+  var newRow = lastDataRow + 2;
+
+  // Formula Tgl_Efektif: jika Tgl_Aktual (kolom C) kosong, gunakan Tgl_Rencana (kolom B)
+  var formulaEfektif = '=IF(ISBLANK(C' + newRow + '),B' + newRow + ',C' + newRow + ')';
+
+  sheet.getRange(newRow, 1, 1, 8).setValues([[
+    escapeFormula(row.idSesi),
+    escapeFormula(row.tglRencana),
+    escapeFormula(row.tglAktual || ''),
+    formulaEfektif,
+    escapeFormula(row.jenis),
+    escapeFormula(row.statusSesi || 'Terjadwal'),
+    Number(row.tarif) || 0,
+    escapeFormula(row.keterangan || '')
+  ]]);
+
+  invalidateCacheSesi();
+  return newRow;
+}
+
+
