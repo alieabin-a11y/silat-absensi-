@@ -1,0 +1,14 @@
+{
+  "name": "cetak-kartu-silat",
+  "version": "1.0.0",
+  "description": "Generator Kartu Absensi QR Siswa Silat Putra Setia Rawa Bebek",
+  "main": "generate.js",
+  "scripts": {
+    "start": "node generate.js"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.3",
+    "pdfkit": "^0.15.0"
+  }
+}
+

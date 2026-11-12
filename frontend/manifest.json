@@ -1,0 +1,45 @@
+{
+  "name": "Absensi Silat Putra Setia",
+  "short_name": "Silat PS",
+  "description": "Aplikasi Absensi & Portal Siswa Perguruan Pencak Silat Putra Setia Rawa Bebek",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0B1120",
+  "theme_color": "#5A0D10",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Portal Orang Tua",
+      "short_name": "Portal Ortu",
+      "description": "Pantau absensi dan riwayat latihan anak",
+      "url": "./ortu.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Presensi Pelatih",
+      "short_name": "Pelatih",
+      "description": "Buka sesi latihan dan scan kehadiran",
+      "url": "./index.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
