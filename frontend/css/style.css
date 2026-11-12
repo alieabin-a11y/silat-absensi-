@@ -642,4 +642,103 @@ label {
   margin-bottom: 6px;
 }
 
+/* ─────────────────────────────────────────────
+   M5: Portal Orang Tua Styles
+   ───────────────────────────────────────────── */
+
+.child-profile-card {
+  text-align: center;
+  padding: 20px 16px;
+  background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%);
+  color: #ffffff;
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+}
+
+.child-avatar {
+  width: 60px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  margin: 0 auto 10px;
+}
+
+.child-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.child-meta {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.attendance-progress-card {
+  background: #ffffff;
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+
+.attendance-percent-number {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.progress-track {
+  width: 100%;
+  height: 8px;
+  background: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 10px 0;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.badge-izin {
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #bbdefb;
+}
+
+.badge-sakit {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffe0b2;
+}
+
+.badge-absent {
+  background: #f1f3f5;
+  color: #6c757d;
+  border: 1px solid #dee2e6;
+}
+
+.parent-session-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+
 

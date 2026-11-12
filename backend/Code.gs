@@ -427,3 +427,90 @@ function testM4Revenue() {
   return { passed: passedCount, total: totalTests };
 }
 
+// ─────────────────────────────────────────────
+// Fungsi uji M5: Portal Orang Tua & Keamanan
+// ─────────────────────────────────────────────
+
+/**
+ * testM5Parent — Pengujian kriteria selesai M5:
+ * 1. PIN salah -> unauthorized
+ * 2. PIN benar -> ok
+ * 3. Bebas uang: tidak ada field nominal uang (tarif, jumlahDibayar, piutang, dll)
+ * 4. Siswa Nonaktif -> pesan netral
+ * 5. Rate limit -> 5x salah terkunci
+ */
+function testM5Parent() {
+  Logger.log('============================================');
+  Logger.log('MEMULAI PENGUJIAN M5 (PORTAL ORANG TUA)');
+  Logger.log('============================================');
+
+  var passedCount = 0;
+  var totalTests = 0;
+
+  function assert(testName, condition, detail) {
+    totalTests++;
+    if (condition) {
+      passedCount++;
+      Logger.log(' [PASS] ' + testName + (detail ? ' (' + detail + ')' : ''));
+    } else {
+      Logger.log(' [FAIL] ' + testName + (detail ? ' (' + detail + ')' : ''));
+    }
+  }
+
+  // Cari satu siswa aktif untuk pengujian (ambil PIN internal)
+  var allSiswa = getAllSiswa();
+  var siswaAktif = null;
+  var siswaNonaktif = null;
+  for (var i = 0; i < allSiswa.length; i++) {
+    if (allSiswa[i].status === 'Aktif' && !siswaAktif) siswaAktif = allSiswa[i];
+    if (allSiswa[i].status === 'Nonaktif' && !siswaNonaktif) siswaNonaktif = allSiswa[i];
+  }
+
+  if (!siswaAktif) {
+    Logger.log('Tidak ada siswa aktif di sheet.');
+    return;
+  }
+
+  // 1. PIN salah
+  var resSalah = JSON.parse(parentView({ idSiswa: siswaAktif.idSiswa, pin: '9999' }).getContent());
+  assert('1. PIN salah ditolak dengan unauthorized', resSalah.ok === false && resSalah.code === 'unauthorized', resSalah.message);
+
+  // 2. PIN benar
+  var resBenar = JSON.parse(parentView({ idSiswa: siswaAktif.idSiswa, pin: siswaAktif.pin }).getContent());
+  assert('2. PIN benar berhasil memuat data', resBenar.ok === true && resBenar.data && resBenar.data.siswa, resBenar.message);
+
+  // 3. Verifikasi Keamanan: Bebas nominal uang
+  var jsonStr = JSON.stringify(resBenar);
+  var hasMoneyFields = /tarif|jumlahDibayar|pendapatan|seharusnya|piutang/i.test(jsonStr);
+  assert('3. Respons MUTLAK bebas dari field uang', hasMoneyFields === false, 'Deteksi field uang: ' + hasMoneyFields);
+
+  // 4. Verifikasi Siswa Nonaktif
+  if (siswaNonaktif) {
+    var resNonaktif = JSON.parse(parentView({ idSiswa: siswaNonaktif.idSiswa, pin: siswaNonaktif.pin }).getContent());
+    assert('4. Siswa Nonaktif mendapat pesan netral & tanpa riwayat', resNonaktif.ok === true && resNonaktif.data.isNonaktif === true && resNonaktif.data.riwayat.length === 0, resNonaktif.data.pesan);
+  }
+
+  // 5. Rate limit uji coba pada ID dummy S998
+  var dummyId = 'S998';
+  var cache = CacheService.getScriptCache();
+  cache.remove('PARENT_ATTEMPTS_' + dummyId); // Bersihkan dulu
+
+  // Lakukan 5 percobaan salah
+  for (var k = 0; k < 5; k++) {
+    parentView({ idSiswa: dummyId, pin: '0000' });
+  }
+  var resLocked = JSON.parse(parentView({ idSiswa: dummyId, pin: '0000' }).getContent());
+  assert('5. Percobaan salah 5x terkunci sementara (rate_limited)', resLocked.code === 'rate_limited', resLocked.message);
+  cache.remove('PARENT_ATTEMPTS_' + dummyId); // Bersihkan kembali
+
+  Logger.log('============================================');
+  Logger.log('HASIL PENGUJIAN M5: ' + passedCount + ' / ' + totalTests + ' LULUS');
+  if (passedCount === totalTests) {
+    Logger.log('✅ SELURUH SKENARIO M5 LULUS 100%!');
+  } else {
+    Logger.log('⚠️ Ada skenario yang belum lolos.');
+  }
+  Logger.log('============================================');
+  return { passed: passedCount, total: totalTests };
+}
+

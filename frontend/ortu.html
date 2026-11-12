@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1b5e20">
+  <title>Portal Orang Tua — Absensi Silat Putra Setia</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Top Navigation / Header -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand">
+        <img src="img/logo.jpg" alt="Logo Putra Setia" class="brand-logo" onerror="this.style.display='none'">
+        <div>
+          <h1 class="brand-title">Putra Setia</h1>
+          <p class="brand-subtitle">Portal Orang Tua & Siswa</p>
+        </div>
+      </div>
+      <div id="parentHeaderProfile" class="hidden" style="text-align: right;">
+        <span id="headerStudentName" style="font-weight: 700; font-size: 0.85rem; display: block; max-width: 130px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Anak</span>
+        <button id="btnLogoutParent" class="btn btn-secondary btn-sm" style="margin-top: 2px; padding: 2px 8px; font-size: 0.75rem;">Keluar</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- 1. VIEW LOGIN ORANG TUA -->
+    <section id="loginParentSection" class="card">
+      <div style="text-align: center; margin-bottom: 20px;">
+        <div style="font-size: 2.2rem; margin-bottom: 6px;">🥋</div>
+        <h2 style="font-size: 1.25rem; color: var(--primary);">Masuk Portal Siswa</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Pantau kehadiran dan riwayat latihan anak Anda</p>
+      </div>
+
+      <div id="loginParentAlert" class="feedback-card feedback-danger" style="margin-bottom: 16px; display: none;"></div>
+
+      <form id="formParentLogin">
+        <div class="form-group">
+          <label for="inputStudentId">ID Siswa (pada kartu QR)</label>
+          <input type="text" id="inputStudentId" class="form-control" placeholder="Contoh: S001" required maxlength="10" autocomplete="username" style="text-transform: uppercase;">
+        </div>
+
+        <div class="form-group">
+          <label for="inputStudentPin">PIN 4 Digit</label>
+          <input type="password" id="inputStudentPin" class="form-control" placeholder="••••" required maxlength="4" inputmode="numeric" pattern="\d{4}" autocomplete="current-password">
+          <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 4px;">PIN 4 digit rahasia yang diberikan pelatih.</span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 18px;">
+          <input type="checkbox" id="checkRememberMe" checked style="width: 18px; height: 18px; accent-color: var(--primary);">
+          <label for="checkRememberMe" style="font-size: 0.85rem; cursor: pointer; user-select: none;">Ingat di perangkat ini</label>
+        </div>
+
+        <button type="submit" id="btnSubmitParentLogin" class="btn btn-primary">
+          <span>Lihat Kehadiran Anak</span>
+        </button>
+      </form>
+
+      <div style="text-align: center; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 14px;">
+        <a href="index.html" style="font-size: 0.85rem; color: var(--primary); text-decoration: none; font-weight: 600;">
+          ← Masuk sebagai Pelatih
+        </a>
+      </div>
+    </section>
+
+    <!-- 2. VIEW PORTAL / DASHBOARD ANAK -->
+    <section id="portalParentSection" class="hidden">
+
+      <!-- Kartu Profil Anak -->
+      <div class="child-profile-card">
+        <div class="child-avatar">🥋</div>
+        <div id="displayChildName" class="child-name">Nama Siswa</div>
+        <div id="displayChildMeta" class="child-meta">ID: S001 • Sabuk Hijau</div>
+      </div>
+
+      <!-- Banner Status Nonaktif (Jika berstatus nonaktif) -->
+      <div id="bannerNonaktif" class="feedback-card feedback-warning" style="display: none; margin-bottom: 16px;">
+        <div class="feedback-title">Pemberitahuan Status</div>
+        <div id="textPesanNonaktif" class="feedback-desc">Siswa saat ini berstatus Nonaktif. Silakan hubungi pelatih untuk informasi lebih lanjut.</div>
+      </div>
+
+      <!-- Konten Utama (Jika siswa aktif) -->
+      <div id="activeStudentContent">
+        <!-- Kartu Persentase Kehadiran -->
+        <div class="attendance-progress-card">
+          <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+            <div>
+              <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Kehadiran Latihan Umum</div>
+              <div id="displayPercentText" class="attendance-percent-number">0%</div>
+            </div>
+            <div id="displayHadirRatio" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">0 dari 0 sesi</div>
+          </div>
+          <div class="progress-track">
+            <div id="progressFillBar" class="progress-fill" style="width: 0%;"></div>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">
+            Latihan Umum diadakan setiap hari Sabtu.
+          </div>
+        </div>
+
+        <!-- Kartu Statistik Sesi -->
+        <div class="stat-grid">
+          <div class="stat-box">
+            <div class="stat-box-title">Hadir Latihan Umum</div>
+            <div id="statHadirUmum" class="stat-box-value text-primary">0 Kali</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-box-title">Hadir Latihan Khusus</div>
+            <div id="statHadirKhusus" class="stat-box-value text-primary">0 Kali</div>
+          </div>
+        </div>
+
+        <!-- Daftar Riwayat Kehadiran Per Sesi -->
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+            <h3 style="font-size: 1rem; color: var(--primary);">Riwayat Per Sesi</h3>
+            <span id="totalRiwayatCount" style="font-size: 0.8rem; color: var(--text-muted);">0 Sesi</span>
+          </div>
+
+          <div id="parentSessionList">
+            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 14px 0;">Memuat riwayat sesi...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Privasi & Kontak Pelatih -->
+      <div style="text-align: center; margin-top: 20px; font-size: 0.78rem; color: var(--text-muted); line-height: 1.6;">
+        <p>🔒 <strong>Privasi Aman:</strong> Data kehadiran hanya dapat diakses dengan PIN resmi dari pelatih.</p>
+        <p>Putra Setia Rawa Bebek • Menjaga Amanah & Prestasi</p>
+      </div>
+
+    </section>
+
+  </main>
+
+  <script src="js/ortu.js?v=1.0"></script>
+</body>
+</html>
