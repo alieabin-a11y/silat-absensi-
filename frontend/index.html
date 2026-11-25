@@ -15,7 +15,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Silat PS">
 
-  <link rel="stylesheet" href="css/style.css?v=3.2">
+  <link rel="stylesheet" href="css/style.css?v=3.3">
   <!-- html5-qrcode pinned version 2.3.8 -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
@@ -52,8 +52,8 @@
         <div style="width: 52px; height: 52px; background: var(--primary-light); color: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
         </div>
-        <h2 style="font-size: 1.3rem; color: var(--primary); font-weight: 800;">Masuk Pelatih</h2>
-        <p style="font-size: 0.85rem; color: var(--text-muted);">Masukkan nama pelatih dan passcode rahasia</p>
+        <h2 style="font-size: 1.3rem; color: var(--primary); font-weight: 800;">Selamat Datang, Pelatih!</h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Pilih nama Anda dan masukkan passcode untuk membuka absensi.</p>
       </div>
 
       <div id="loginAlert" class="feedback-card feedback-danger" style="margin-bottom: 16px;"></div>
@@ -68,18 +68,18 @@
         </div>
 
         <div class="form-group">
-          <label for="inputPasscode">Passcode</label>
-          <input type="password" id="inputPasscode" class="form-control" placeholder="Masukkan passcode" required inputmode="numeric">
+          <label for="inputPasscode">Passcode Pelatih</label>
+          <input type="password" id="inputPasscode" class="form-control" placeholder="Ketik passcode 6 angka" required inputmode="numeric">
         </div>
 
         <button type="submit" id="btnLogin" class="btn btn-primary">
-          <span>Masuk Dashboard</span>
+          <span>Buka Dashboard Absensi</span>
         </button>
       </form>
 
       <div style="text-align: center; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 14px;">
         <a href="ortu.html" style="font-size: 0.85rem; color: var(--primary); text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
-          Orang Tua / Wali Siswa? Buka Portal Siswa
+          Bukan pelatih? Cek riwayat anak di Portal Wali Murid
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
         </a>
       </div>
@@ -93,16 +93,16 @@
         <!-- Banner Info Sesi Aktif -->
         <div class="session-banner">
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span id="sessionBadge" class="session-badge badge-umum">Umum</span>
+            <span id="sessionBadge" class="session-badge badge-umum">Reguler</span>
             <span id="sessionTarif" style="font-weight: 800; color: var(--primary); font-size: 1rem;">Rp15.000</span>
           </div>
-          <div class="session-title" id="sessionTitle">Memuat sesi...</div>
+          <div class="session-title" id="sessionTitle">Memuat jadwal latihan...</div>
           <div class="session-meta" id="sessionMeta">Tanggal: -</div>
 
           <!-- Tombol Ganti Sesi -->
           <div style="margin-top: 10px;">
             <button id="btnToggleSessionSelect" class="btn btn-secondary btn-sm" style="width: 100%;">
-              <span>Pilih Sesi Lain</span>
+              <span>🔄 Ganti Jadwal Latihan</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </button>
             <div id="sessionSelectContainer" class="hidden" style="margin-top: 10px;">
@@ -114,12 +114,12 @@
         <!-- Kamera Scan QR -->
         <div class="card scanner-card">
           <div class="scanner-toolbar">
-            <h2 style="font-size: 1.1rem; color: var(--primary); font-weight: 800;">Scan Kartu QR</h2>
+            <h2 style="font-size: 1.1rem; color: var(--primary); font-weight: 800;">Arahkan Kamera ke Kartu QR</h2>
             <div class="scanner-actions">
               <!-- Fast Scan Mode Toggle -->
               <button id="btnFastScanToggle" class="fast-scan-toggle active" title="Ubah Mode Scan">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-                <span id="fastScanLabel">Mode Cepat</span>
+                <span id="fastScanLabel">Mode Kilat</span>
               </button>
 
               <!-- Flashlight / Senter Toggle -->
@@ -128,7 +128,7 @@
               </button>
 
               <!-- Jeda / Nyalakan Kamera -->
-              <button id="btnToggleCamera" class="btn btn-secondary btn-sm">Jeda</button>
+              <button id="btnToggleCamera" class="btn btn-secondary btn-sm">⏸️ Jeda</button>
             </div>
           </div>
 
@@ -137,15 +137,15 @@
 
           <!-- Feedback Alert Cards -->
           <div id="feedbackCard" class="feedback-card">
-            <div id="feedbackTitle" class="feedback-title">Status Absensi</div>
-            <div id="feedbackDesc" class="feedback-desc">Keterangan hasil scan</div>
+            <div id="feedbackTitle" class="feedback-title">Hasil Scan Kartu</div>
+            <div id="feedbackDesc" class="feedback-desc">Arahkan kamera ke kartu QR siswa untuk presensi otomatis</div>
             <div id="feedbackActions" class="feedback-actions"></div>
           </div>
 
           <!-- Manual Search Box (Fallback jika QR rusak) -->
           <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px;">
-            <label for="inputManualSearch">Cari Manual Siswa</label>
-            <input type="text" id="inputManualSearch" class="form-control" placeholder="Ketik nama / ID siswa (contoh: Yasmin, S001)">
+            <label for="inputManualSearch">Siswa Lupa Bawa Kartu QR?</label>
+            <input type="text" id="inputManualSearch" class="form-control" placeholder="Ketik nama panggilan siswa (misal: Budi, Yasmin)...">
             <div id="studentSearchResults" class="student-search-results"></div>
           </div>
         </div>
@@ -153,20 +153,20 @@
         <!-- Riwayat Absensi Sesi Ini -->
         <div class="card">
           <div class="attendance-history-title">
-            <h3 style="font-size: 1rem; color: var(--primary); font-weight: 800;">Kehadiran Sesi Ini</h3>
+            <h3 style="font-size: 1rem; color: var(--primary); font-weight: 800;">Daftar Hadir Latihan</h3>
             <span id="attendanceCount" style="font-weight: 800; font-size: 0.9rem; color: var(--primary);">0 Hadir</span>
           </div>
 
           <!-- Roster Segmented Control -->
           <div class="roster-segmented-control" role="tablist" aria-label="Filter Kehadiran">
             <button type="button" class="roster-segment-btn active" data-roster-filter="hadir" id="rosterFilterHadir" role="tab" aria-selected="true">
-              Hadir (<span id="rosterCountHadir">0</span>)
+              Sudah Hadir (<span id="rosterCountHadir">0</span>)
             </button>
             <button type="button" class="roster-segment-btn" data-roster-filter="belum" id="rosterFilterBelum" role="tab" aria-selected="false">
-              Belum (<span id="rosterCountBelum">0</span>)
+              Belum Hadir (<span id="rosterCountBelum">0</span>)
             </button>
             <button type="button" class="roster-segment-btn" data-roster-filter="semua" id="rosterFilterSemua" role="tab" aria-selected="false">
-              Semua (<span id="rosterCountSemua">0</span>)
+              Semua Siswa (<span id="rosterCountSemua">0</span>)
             </button>
           </div>
 
@@ -178,13 +178,13 @@
           </div>
 
           <div id="attendanceList">
-            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Belum ada siswa yang discan pada sesi ini.</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Belum ada siswa yang hadir. Arahkan kamera ke kartu QR atau catat manual di atas.</p>
           </div>
           <!-- Tombol Tutup Sesi -->
           <div style="margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px;">
             <button id="btnCloseSession" class="btn btn-secondary" style="width: 100%; font-size: 0.9rem;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-              Tutup Sesi (Tandai Terlaksana)
+              Selesaikan Latihan & Kunci Presensi
             </button>
           </div>
         </div>
@@ -193,8 +193,8 @@
       <!-- TAB 2: PENDAPATAN & REKAP BULANAN -->
       <div id="panePendapatan" class="tab-pane hidden">
         <div class="card">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <h2 style="font-size: 1.1rem; color: var(--primary); font-weight: 800;">Pendapatan Bulanan</h2>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <h2 style="font-size: 1.1rem; color: var(--primary); font-weight: 800;">Rekap Kas & Iuran Latihan</h2>
             <div style="display: flex; gap: 6px;">
               <input type="month" id="inputMonthRevenue" class="form-control" style="padding: 4px 8px; font-size: 0.85rem; width: auto; min-height: 44px;">
               <button id="btnRefreshRevenue" class="btn btn-secondary btn-icon" title="Perbarui Data">
@@ -202,10 +202,11 @@
               </button>
             </div>
           </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Pantau total uang kas masuk yang diterima dan iuran siswa per bulan.</p>
 
           <!-- Stat Box: TOTAL -->
           <div style="margin-bottom: 16px;">
-            <div style="font-size: 0.85rem; font-weight: 800; color: var(--primary); margin-bottom: 8px;">TOTAL KESELURUHAN</div>
+            <div style="font-size: 0.85rem; font-weight: 800; color: var(--primary); margin-bottom: 8px;">RINGKASAN TOTAL KAS</div>
             <div class="stat-grid">
               <div class="stat-box">
                 <div class="stat-box-title">Total Hadir</div>
@@ -216,11 +217,11 @@
                 <div id="revTotalSesi" class="stat-box-value">-</div>
               </div>
               <div class="stat-box">
-                <div class="stat-box-title">Diterima</div>
+                <div class="stat-box-title">Kas Masuk (Lunas)</div>
                 <div id="revTotalDiterima" class="stat-box-value text-success">-</div>
               </div>
               <div class="stat-box">
-                <div class="stat-box-title">Piutang (Belum Bayar)</div>
+                <div class="stat-box-title">Iuran Belum Lunas</div>
                 <div id="revTotalPiutang" class="stat-box-value text-danger">-</div>
               </div>
             </div>
@@ -278,9 +279,9 @@
 
           <!-- Tombol Salin Rekap WA -->
           <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px;">
-            <button id="btnCopyReportWA" class="btn-copy-report" type="button" aria-label="Salin Rekap Bulanan untuk WhatsApp">
+            <button id="btnCopyReportWA" class="btn-copy-report" type="button" aria-label="Salin Rekap Kas untuk WhatsApp">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
-              <span>Salin Rekap Bulanan untuk WhatsApp</span>
+              <span>📋 Salin Rekap Kas untuk Grup WhatsApp</span>
             </button>
           </div>
         </div>
@@ -291,8 +292,8 @@
         <div class="card">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <div>
-              <h2 style="font-size: 1.1rem; color: var(--primary); font-weight: 800;">Daftar Tunggakan</h2>
-              <div id="debtorSummaryText" style="font-size: 0.8rem; color: var(--text-muted);">Memuat tunggakan...</div>
+              <h2 style="font-size: 1.1rem; color: var(--primary); font-weight: 800;">Daftar Siswa Belum Bayar Kas</h2>
+              <div id="debtorSummaryText" style="font-size: 0.8rem; color: var(--text-muted);">Memuat catatan kas...</div>
             </div>
             <button id="btnRefreshDebtors" class="btn btn-secondary btn-icon" title="Perbarui Data">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
@@ -301,7 +302,7 @@
 
           <!-- Kontainer Kartu Penunggak -->
           <div id="debtorsList">
-            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Memuat daftar penunggak...</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Memuat catatan siswa belum bayar kas...</p>
           </div>
         </div>
       </div>
@@ -310,11 +311,11 @@
       <div id="paneKelolaSesi" class="tab-pane hidden">
         <div class="card">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px;">
-            <h2 style="font-size: 1.1rem; color: var(--primary); font-weight: 800;">Kelola Sesi Latihan</h2>
+            <h2 style="font-size: 1.1rem; color: var(--primary); font-weight: 800;">Jadwal Latihan Silat</h2>
             <div style="display: flex; gap: 6px;">
               <button id="btnOpenCreateSessionModal" class="btn btn-primary btn-sm" style="font-weight: 700;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                Buat Sesi Baru
+                + Jadwalkan Latihan Baru
               </button>
               <button id="btnRefreshSessions" class="btn btn-secondary btn-icon" title="Perbarui Data">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
@@ -322,11 +323,11 @@
             </div>
           </div>
           <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">
-            Buat sesi baru, ubah tanggal aktual (jika jadwal digeser), status sesi (Terjadwal/Terlaksana/Batal), atau catatan.
+            Atur jadwal latihan mingguan, geser tanggal latihan jika perlu, atau tambah jadwal baru.
           </p>
 
           <div id="sessionsManageList">
-            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Memuat daftar sesi...</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Memuat jadwal sesi latihan...</p>
           </div>
         </div>
       </div>
@@ -340,7 +341,7 @@
           <div class="modal-icon-svg">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
           </div>
-          <h3 id="modalSessionTitle" class="modal-title">Edit Sesi</h3>
+          <h3 id="modalSessionTitle" class="modal-title">Ubah Jadwal Latihan</h3>
         </div>
         <div class="modal-body" style="text-align: left;">
           <input type="hidden" id="editSessionId">
@@ -359,12 +360,12 @@
           </div>
           <div class="form-group" style="margin-bottom: 12px;">
             <label style="font-size: 0.85rem; font-weight: 600;">Keterangan</label>
-            <input type="text" id="editSessionKeterangan" class="form-control" placeholder="Contoh: Digeser karena hujan">
+            <input type="text" id="editSessionKeterangan" class="form-control" placeholder="Contoh: Digeser karena hujan deras">
           </div>
         </div>
         <div class="modal-actions">
-          <button id="btnSaveSessionEdit" class="btn btn-primary">Simpan Perubahan</button>
-          <button id="btnCancelSessionEdit" class="btn btn-secondary">Batal</button>
+          <button id="btnSaveSessionEdit" class="btn btn-primary">Simpan Jadwal Baru</button>
+          <button id="btnCancelSessionEdit" class="btn btn-secondary">Kembali</button>
         </div>
       </div>
     </div>
@@ -376,33 +377,33 @@
           <div class="modal-icon-svg">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
           </div>
-          <h3 class="modal-title">Buat Sesi Latihan Baru</h3>
+          <h3 class="modal-title">Jadwalkan Latihan Baru</h3>
         </div>
         <div class="modal-body" style="text-align: left;">
           <div class="form-group" style="margin-bottom: 12px;">
-            <label style="font-size: 0.85rem; font-weight: 600;">Tanggal Sesi</label>
+            <label style="font-size: 0.85rem; font-weight: 600;">Tanggal Latihan</label>
             <input type="date" id="newSessionDate" class="form-control" required>
           </div>
           <div class="form-group" style="margin-bottom: 12px;">
             <label style="font-size: 0.85rem; font-weight: 600;">Jenis Latihan</label>
             <select id="newSessionJenis" class="form-control">
-              <option value="Umum">Umum (Rutin Sabtu - Rp 15.000)</option>
-              <option value="Khusus">Khusus (Selasa/Kamis - Rp 5.000)</option>
+              <option value="Umum">Latihan Reguler Sabtu Malam (Rp 15.000)</option>
+              <option value="Khusus">Latihan Khusus TC / Tanding (Rp 5.000)</option>
               <option value="Ujian">Ujian Kenaikan Tingkat (Rp 15.000)</option>
             </select>
           </div>
           <div class="form-group" style="margin-bottom: 12px;">
-            <label style="font-size: 0.85rem; font-weight: 600;">Tarif Kas / SPP (Rp)</label>
+            <label style="font-size: 0.85rem; font-weight: 600;">Tarif Kas / Iuran (Rp)</label>
             <input type="number" id="newSessionTarif" class="form-control" value="15000" min="0" step="1000">
           </div>
           <div class="form-group" style="margin-bottom: 12px;">
-            <label style="font-size: 0.85rem; font-weight: 600;">Keterangan</label>
-            <input type="text" id="newSessionKeterangan" class="form-control" placeholder="Contoh: Latihan rutin Sabtu malam">
+            <label style="font-size: 0.85rem; font-weight: 600;">Keterangan Tambahan</label>
+            <input type="text" id="newSessionKeterangan" class="form-control" placeholder="Contoh: Latihan rutin persiapan tanding">
           </div>
         </div>
         <div class="modal-actions">
-          <button id="btnSaveNewSession" class="btn btn-primary">Simpan Sesi</button>
-          <button id="btnCancelNewSession" class="btn btn-secondary">Batal</button>
+          <button id="btnSaveNewSession" class="btn btn-primary">Jadwalkan Sekarang</button>
+          <button id="btnCancelNewSession" class="btn btn-secondary">Kembali</button>
         </div>
       </div>
     </div>
@@ -423,6 +424,31 @@
         </div>
         <div id="modalActions" class="modal-actions">
           <!-- Tombol Lunas / Belum Bayar akan diisi secara dinamis -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Pemilih Sesi Pintar (Smart Session Selector) -->
+    <div id="sessionPickerModal" class="modal-overlay hidden">
+      <div class="modal-dialog" style="max-height: 85vh; display: flex; flex-direction: column;">
+        <div class="modal-header" style="border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+          <div class="modal-icon-svg">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+          <div>
+            <h3 class="modal-title" style="text-align: left; margin: 0;">Pilih Jadwal Latihan</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 2px 0 0 0; text-align: left;">Buka sesi latihan untuk absensi dan catat kas siswa</p>
+          </div>
+        </div>
+        <div id="sessionPickerList" class="modal-body" style="text-align: left; overflow-y: auto; flex: 1; padding: 14px 16px;">
+          <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Memuat jadwal sesi latihan...</p>
+        </div>
+        <div class="modal-actions" style="flex-direction: column; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border);">
+          <button id="btnPickerCreateSession" class="btn btn-primary" style="width: 100%;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            + Jadwalkan Latihan Baru
+          </button>
+          <button id="btnPickerClose" class="btn btn-secondary" style="width: 100%;">Tutup</button>
         </div>
       </div>
     </div>
@@ -449,7 +475,7 @@
     </button>
   </nav>
 
-  <script src="js/app.js?v=3.2"></script>
+  <script src="js/app.js?v=3.3"></script>
   <script src="js/pwa.js"></script>
 </body>
 </html>

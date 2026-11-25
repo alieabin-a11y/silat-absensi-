@@ -1253,6 +1253,78 @@ label {
   fill: currentColor;
 }
 
+/* Smart Session Selector Modal & Cards */
+.session-picker-group {
+  margin-bottom: 16px;
+}
+.session-picker-group-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--primary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.session-picker-card {
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.session-picker-card:hover, .session-picker-card:active {
+  border-color: var(--primary);
+  background: #fdf8f8;
+}
+.session-picker-card.is-today {
+  border-color: #2E7D32;
+  background: #F1F8F1;
+}
+.session-picker-card.active {
+  border-color: var(--accent);
+  background: #FFFDF5;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.2);
+}
+.session-picker-info {
+  flex: 1;
+}
+.session-picker-name {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.session-picker-date {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.session-picker-meta {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-top: 4px;
+}
+.session-picker-btn {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

@@ -245,6 +245,11 @@ const newSessionKeterangan = document.getElementById('newSessionKeterangan');
 const btnSaveNewSession = document.getElementById('btnSaveNewSession');
 const btnCancelNewSession = document.getElementById('btnCancelNewSession');
 
+const sessionPickerModal = document.getElementById('sessionPickerModal');
+const sessionPickerList = document.getElementById('sessionPickerList');
+const btnPickerClose = document.getElementById('btnPickerClose');
+const btnPickerCreateSession = document.getElementById('btnPickerCreateSession');
+
 // ─────────────────────────────────────────────
 // Inisialisasi Aplikasi
 // ─────────────────────────────────────────────
@@ -259,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Event Listeners
   loginForm.addEventListener('submit', handleLogin);
   btnLogout.addEventListener('click', handleLogout);
-  btnToggleSessionSelect.addEventListener('click', toggleSessionDropdown);
+  btnToggleSessionSelect.addEventListener('click', openSessionPickerModal);
   selectSession.addEventListener('change', handleSessionChange);
   btnToggleCamera.addEventListener('click', toggleCamera);
   inputManualSearch.addEventListener('input', handleManualSearch);
@@ -296,6 +301,28 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnCancelNewSession) btnCancelNewSession.addEventListener('click', closeCreateSessionModal);
   if (btnSaveNewSession) btnSaveNewSession.addEventListener('click', handleSaveNewSession);
   if (newSessionJenis) newSessionJenis.addEventListener('change', handleNewSessionJenisChange);
+
+  if (btnPickerClose) btnPickerClose.addEventListener('click', closeSessionPickerModal);
+  if (btnPickerCreateSession) {
+    btnPickerCreateSession.addEventListener('click', () => {
+      closeSessionPickerModal();
+      openCreateSessionModal();
+    });
+  }
+  if (sessionPickerModal) {
+    sessionPickerModal.addEventListener('click', (e) => {
+      if (e.target === sessionPickerModal) closeSessionPickerModal();
+    });
+  }
+  if (sessionPickerList) {
+    sessionPickerList.addEventListener('click', (e) => {
+      const card = e.target.closest('[data-picker-session-id]');
+      if (card) {
+        const sid = card.dataset.pickerSessionId;
+        if (sid) selectSessionById(sid);
+      }
+    });
+  }
 
   // Fast Scan & Flashlight
   if (btnFastScanToggle) {
@@ -391,7 +418,7 @@ async function handleLogin(e) {
 }
 
 function handleLogout() {
-  if (confirm('Yakin ingin keluar?')) {
+  if (confirm('Keluar dari aplikasi absensi pelatih?')) {
     localStorage.removeItem('coach_token');
     localStorage.removeItem('coach_nama');
     currentUser.token = null;
@@ -418,7 +445,7 @@ async function initDashboard() {
 
     if (!res.ok) {
       if (res.code === 'unauthorized') {
-        alert('Sesi login telah berakhir. Silakan login kembali.');
+        showScanToast('error', 'Sesi Masuk Berakhir', 'Sesi login telah berakhir. Silakan masuk kembali.', 3000);
         handleLogout();
         return;
       }
@@ -449,6 +476,29 @@ async function initDashboard() {
   }
 }
 
+function formatTanggalIndo(ymd) {
+  if (!ymd) return '-';
+  const parts = String(ymd).split('-');
+  if (parts.length < 3) return ymd;
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  const dateObj = new Date(y, m, d);
+  if (isNaN(dateObj.getTime())) return ymd;
+  const hariArr = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const bulanArr = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const hari = hariArr[dateObj.getDay()];
+  const bulan = bulanArr[m];
+  return `${hari}, ${d} ${bulan} ${y}`;
+}
+
+function formatNamaLatihan(jenis) {
+  const j = String(jenis || '').toLowerCase();
+  if (j === 'khusus') return 'Latihan Khusus TC / Tanding';
+  if (j === 'ujian') return 'Ujian Kenaikan Tingkat';
+  return 'Latihan Reguler Sabtu Malam';
+}
+
 function findDefaultSession() {
   if (appData.sesi.length === 0) return null;
   // Cari sesi yang bukan batal
@@ -458,8 +508,8 @@ function findDefaultSession() {
 
 function renderSessionInfo() {
   if (!appData.sesiAktif) {
-    sessionTitle.textContent = 'Tidak ada sesi aktif';
-    sessionMeta.textContent = 'Silakan pilih atau tambahkan sesi latihan.';
+    sessionTitle.textContent = 'Tidak Ada Jadwal Aktif';
+    sessionMeta.innerHTML = 'Silakan pilih jadwal latihan atau jadwalkan latihan baru.';
     return;
   }
 
@@ -471,17 +521,27 @@ function renderSessionInfo() {
   sessionBadge.className = 'session-badge ' + (isKhusus ? 'badge-khusus' : 'badge-umum');
   sessionTarif.textContent = 'Rp' + tarif.toLocaleString('id-ID');
 
-  sessionTitle.textContent = `Latihan Silat ${s.jenis} (${s.idSesi})`;
+  sessionTitle.textContent = formatNamaLatihan(s.jenis);
   const tgl = s.tglEfektif || s.tglRencana || '-';
   const isToday = tgl === appData.today;
-  sessionMeta.textContent = `Tanggal: ${tgl} ${isToday ? '• Hari ini (WIB)' : '• Bukan hari ini'}`;
+  const statusHuman = isToday
+    ? '<span style="color: #2E7D32; font-weight: 700;">• Sedang Berlangsung Hari Ini</span>'
+    : (tgl > appData.today
+      ? '<span style="color: #8A6D0B; font-weight: 700;">• Jadwal Mendatang</span>'
+      : `<span style="color: var(--text-muted);">• Sesi Lalu (${s.statusSesi === 'Terlaksana' ? 'Terlaksana' : 'Arsip'})</span>`);
+
+  sessionMeta.innerHTML = `📅 <strong>${formatTanggalIndo(tgl)}</strong> ${statusHuman}`;
+
+  if (btnToggleSessionSelect) {
+    btnToggleSessionSelect.innerHTML = '<span>🔄 Ganti Jadwal Latihan</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+  }
 
   if (btnCloseSession) {
     const isClosed = s.statusSesi === 'Terlaksana';
     btnCloseSession.disabled = isClosed;
     btnCloseSession.innerHTML = isClosed
-      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>Sesi Sudah Terlaksana'
-      : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Tutup Sesi (Tandai Terlaksana)';
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>✓ Latihan Ini Sudah Selesai & Terkunci'
+      : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Selesaikan Latihan & Kunci Presensi';
   }
 
   // Ambil data absensi nyata dari Google Sheets untuk sesi ini
@@ -524,13 +584,134 @@ function populateSessionDropdown() {
   });
 }
 
+function openSessionPickerModal() {
+  if (!sessionPickerModal) return;
+  renderSessionPicker();
+  sessionPickerModal.classList.remove('hidden');
+}
+
+function closeSessionPickerModal() {
+  if (!sessionPickerModal) return;
+  sessionPickerModal.classList.add('hidden');
+}
+
+function renderSessionPicker() {
+  if (!sessionPickerList) return;
+  if (!appData.sesi || appData.sesi.length === 0) {
+    sessionPickerList.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 20px 0;">Belum ada jadwal sesi latihan. Silakan buat sesi baru melalui tombol di bawah.</p>';
+    return;
+  }
+
+  const todayStr = appData.today || new Date().toISOString().substring(0, 10);
+  const activeId = appData.sesiAktif ? appData.sesiAktif.idSesi : null;
+
+  const sesiHariIni = [];
+  const sesiMendatang = [];
+  const sesiLalu = [];
+
+  appData.sesi.forEach(s => {
+    const tgl = s.tglEfektif || s.tglRencana || '';
+    if (tgl === todayStr) {
+      sesiHariIni.push(s);
+    } else if (tgl > todayStr && s.statusSesi !== 'Terlaksana') {
+      sesiMendatang.push(s);
+    } else {
+      sesiLalu.push(s);
+    }
+  });
+
+  // Urutkan mendatang dari yang paling dekat
+  sesiMendatang.sort((a, b) => (a.tglEfektif || a.tglRencana).localeCompare(b.tglEfektif || b.tglRencana));
+  // Urutkan riwayat dari yang paling baru
+  sesiLalu.sort((a, b) => (b.tglEfektif || b.tglRencana).localeCompare(a.tglEfektif || a.tglRencana));
+
+  function createPickerCardHtml(s, isTodayGroup) {
+    const tgl = s.tglEfektif || s.tglRencana;
+    const isCurrentActive = s.idSesi === activeId;
+    const isKhusus = s.jenis === 'Khusus';
+    const tarif = s.tarif || (isKhusus ? appData.tarif.khusus : appData.tarif.umum);
+    const badgeCls = isKhusus ? 'badge-khusus' : 'badge-umum';
+    const cardCls = `session-picker-card ${isTodayGroup ? 'is-today' : ''} ${isCurrentActive ? 'active' : ''}`;
+    const statusText = s.statusSesi === 'Terlaksana' ? '✓ Sudah Terlaksana' : (s.statusSesi === 'Batal' ? '✕ Batal' : 'Terjadwal');
+
+    return `
+      <div class="${cardCls}" data-picker-session-id="${escapeHtml(s.idSesi)}" role="button" tabindex="0" aria-label="Pilih sesi ${escapeHtml(formatNamaLatihan(s.jenis))}">
+        <div class="session-picker-info">
+          <div class="session-picker-name">
+            ${isCurrentActive ? '🟢 ' : ''}${escapeHtml(formatNamaLatihan(s.jenis))}
+          </div>
+          <div class="session-picker-date">
+            <span>📅 ${escapeHtml(formatTanggalIndo(tgl))}</span>
+            <span class="session-badge ${badgeCls}" style="font-size: 0.7rem; padding: 2px 7px;">${escapeHtml(s.jenis)}</span>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(s.idSesi)}</span>
+          </div>
+          <div class="session-picker-meta">
+            <span>Tarif: Rp${tarif.toLocaleString('id-ID')}</span> • <span>${statusText}</span>
+          </div>
+        </div>
+        <div>
+          ${isCurrentActive
+            ? '<button type="button" class="btn btn-secondary session-picker-btn" style="pointer-events: none; border-color: var(--accent); color: var(--primary);">✓ Aktif</button>'
+            : `<button type="button" class="btn btn-primary session-picker-btn" data-picker-btn-id="${escapeHtml(s.idSesi)}">Pilih Sesi</button>`
+          }
+        </div>
+      </div>
+    `;
+  }
+
+  let html = '';
+
+  if (sesiHariIni.length > 0) {
+    html += `
+      <div class="session-picker-group">
+        <div class="session-picker-group-title">
+          <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#2E7D32;"></span>
+          ⚡ Sesi Latihan Hari Ini
+        </div>
+        ${sesiHariIni.map(s => createPickerCardHtml(s, true)).join('')}
+      </div>
+    `;
+  }
+
+  if (sesiMendatang.length > 0) {
+    html += `
+      <div class="session-picker-group">
+        <div class="session-picker-group-title">
+          🗓️ Jadwal Latihan Mendatang
+        </div>
+        ${sesiMendatang.map(s => createPickerCardHtml(s, false)).join('')}
+      </div>
+    `;
+  }
+
+  if (sesiLalu.length > 0) {
+    html += `
+      <div class="session-picker-group">
+        <div class="session-picker-group-title">
+          📁 Riwayat Sesi Lalu (Arsip / Susulan)
+        </div>
+        ${sesiLalu.map(s => createPickerCardHtml(s, false)).join('')}
+      </div>
+    `;
+  }
+
+  sessionPickerList.innerHTML = html;
+}
+
+function selectSessionById(sessionId) {
+  const found = appData.sesi.find(s => s.idSesi === sessionId);
+  if (found) {
+    appData.sesiAktif = found;
+    if (selectSession) selectSession.value = sessionId;
+    renderSessionInfo();
+    closeSessionPickerModal();
+    playChime('neutral');
+    showScanToast('info', 'Jadwal Dipilih', formatNamaLatihan(found.jenis));
+  }
+}
+
 function toggleSessionDropdown() {
-  sessionSelectContainer.classList.toggle('hidden');
-  const isHidden = sessionSelectContainer.classList.contains('hidden');
-  const chevronSvg = isHidden
-    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>'
-    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>';
-  btnToggleSessionSelect.innerHTML = `<span>${isHidden ? 'Pilih Sesi Lain' : 'Tutup Pilihan'}</span>${chevronSvg}`;
+  openSessionPickerModal();
 }
 
 function handleSessionChange(e) {
@@ -1019,10 +1200,10 @@ async function markQuickPaid(idSesi, idSiswa, customJumlah = null) {
 
 function promptMarkPaid(idSesi, idSiswa, nama, isPaid) {
   if (isPaid) {
-    alert(`Siswa ${nama} (${idSiswa}) sudah berstatus LUNAS.`);
+    showScanToast('info', 'Sudah Lunas', `Siswa ${nama} sudah berstatus LUNAS.`);
     return;
   }
-  if (confirm(`Tandai pembayaran ${nama} (${idSiswa}) sebagai LUNAS (Tunai)?`)) {
+  if (confirm(`Tandai iuran ${nama} (${idSiswa}) sebagai LUNAS (Tunai)?`)) {
     markQuickPaid(idSesi, idSiswa);
   }
 }
@@ -1186,7 +1367,7 @@ function createUnattendedRow(student, isKhususSession, pesertaKhususSet) {
 
 async function quickMarkStudentPresent(student, btnEl) {
   if (!appData.sesiAktif) {
-    alert('Pilih sesi aktif terlebih dahulu.');
+    showScanToast('warning', 'Pilih Jadwal Latihan', 'Silakan pilih jadwal latihan aktif terlebih dahulu.');
     return;
   }
   if (isProcessingScan) return;
@@ -1292,7 +1473,7 @@ function renderAttendanceList() {
 
 function showAttendanceOptions(siswa) {
   if (!appData.sesiAktif) {
-    alert('Pilih sesi aktif terlebih dahulu.');
+    showScanToast('warning', 'Pilih Jadwal Latihan', 'Silakan pilih jadwal latihan aktif terlebih dahulu.');
     return;
   }
   openScanModal(
@@ -1413,17 +1594,18 @@ async function submitDeleteAttendance(idSesi, idSiswa, namaDisplay) {
 
 async function handleCloseSession() {
   if (!appData.sesiAktif) {
-    alert('Tidak ada sesi aktif yang bisa ditutup.');
+    showScanToast('warning', 'Tidak Ada Jadwal Aktif', 'Tidak ada jadwal latihan aktif yang bisa diselesaikan.');
     return;
   }
   const sesi = appData.sesiAktif;
-  if (!confirm(`Tutup sesi "${sesi.idSesi}" dan tandai sebagai Terlaksana?\n\nTotal hadir: ${sessionAttendanceList.length} siswa.`)) {
+  const tglTutup = sesi.tglEfektif || sesi.tglRencana;
+  if (!confirm(`Selesaikan latihan ini dan kunci daftar presensi?\n\nJadwal: ${formatNamaLatihan(sesi.jenis)}\nTanggal: ${formatTanggalIndo(tglTutup)}\nTotal hadir: ${sessionAttendanceList.length} siswa.\n\nSetelah dikunci, sesi ditandai Terlaksana.`)) {
     return;
   }
   const lockSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>';
   btnCloseSession.disabled = true;
-  btnCloseSession.innerHTML = '<span class="spinner" style="border-color: rgba(123,19,23,0.25); border-top-color: var(--primary);"></span> Menutup sesi...';
-  showFeedback('warning', 'Menutup Sesi...', `Memperbarui status sesi ${sesi.idSesi}...`);
+  btnCloseSession.innerHTML = '<span class="spinner" style="border-color: rgba(123,19,23,0.25); border-top-color: var(--primary);"></span> Mengunci presensi...';
+  showFeedback('warning', 'Mengunci Presensi...', `Menyimpan status selesai untuk ${formatNamaLatihan(sesi.jenis)}...`);
   try {
     const res = await apiRequest('updateSession', {
       idSesi: sesi.idSesi,
@@ -1440,17 +1622,17 @@ async function handleCloseSession() {
         if (idx !== -1) appData.sesi[idx] = res.data.sesi;
         renderSessionInfo();
       }
-      showFeedback('success', 'Sesi Ditutup', `Sesi ${sesi.idSesi} sudah ditandai Terlaksana.`);
-      btnCloseSession.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>Sesi Sudah Terlaksana';
+      showFeedback('success', 'Latihan Selesai & Terkunci', `Presensi ${formatNamaLatihan(sesi.jenis)} berhasil dikunci.`);
+      btnCloseSession.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>✓ Latihan Ini Sudah Selesai & Terkunci';
     } else {
-      showFeedback('danger', 'Gagal Tutup Sesi', res.message || 'Gagal update status sesi.');
+      showFeedback('danger', 'Gagal Kunci Presensi', res.message || 'Gagal mengubah status sesi.');
       btnCloseSession.disabled = false;
-      btnCloseSession.innerHTML = `${lockSvg}Tutup Sesi (Tandai Terlaksana)`;
+      btnCloseSession.innerHTML = `${lockSvg}Selesaikan Latihan & Kunci Presensi`;
     }
   } catch (err) {
     showFeedback('danger', 'Koneksi Error', 'Gagal menghubungi server.');
     btnCloseSession.disabled = false;
-    btnCloseSession.innerHTML = `${lockSvg}Tutup Sesi (Tandai Terlaksana)`;
+    btnCloseSession.innerHTML = `${lockSvg}Selesaikan Latihan & Kunci Presensi`;
   }
 }
 
@@ -1548,28 +1730,31 @@ async function copyRevenueReportWA() {
   const perSesi = cachedRevenueData.perSesi || [];
   const bulanLabel = formatBulanIndo(cachedRevenueData.bulan);
   const sesiLines = perSesi.map(s => {
-    const tglPendek = (s.tanggal || '').substring(5);
-    return `• ${s.idSesi} (${tglPendek}): ${s.jumlahHadir} hadir | Diterima Rp${s.diterima.toLocaleString('id-ID')}`;
+    const tglIndo = formatTanggalIndo(s.tanggal);
+    const namaSesi = formatNamaLatihan(s.jenis);
+    return `• ${namaSesi} (${tglIndo}): ${s.jumlahHadir} siswa | Masuk: Rp${s.diterima.toLocaleString('id-ID')}${s.piutang > 0 ? ` | Belum: Rp${s.piutang.toLocaleString('id-ID')}` : ''}`;
   }).join('\n');
 
   const lines = [
-    '*REKAP KAS LATIHAN PUTRA SETIA RAWA BEBEK*',
-    `Bulan: ${bulanLabel}`,
-    `Total Kehadiran: ${r.total.totalHadir} Siswa`,
-    `Jumlah Sesi Terlaksana: ${r.total.jumlahSesi} Sesi`,
+    '🥋 *LAPORAN REKAP KAS LATIHAN SILAT PUTRA SETIA*',
+    '📍 Cabang Rawa Bebek',
+    `🗓️ Periode: *${bulanLabel}*`,
+    '────────────────────────',
+    `👥 Total Siswa Hadir: *${r.total.totalHadir} siswa*`,
+    `🥋 Total Sesi Terlaksana: *${r.total.jumlahSesi} sesi latihan*`,
     '',
-    `Kas Diterima: *Rp${r.total.diterima.toLocaleString('id-ID')}*`,
-    `Piutang Kas: Rp${r.total.piutang.toLocaleString('id-ID')}`,
-    '',
-    '*Rincian Jenis Latihan:*',
-    `- Latihan Umum (Sabtu): ${r.umum.totalHadir} hadir / ${r.umum.jumlahSesi} sesi (Rp${r.umum.diterima.toLocaleString('id-ID')})`,
-    `- Latihan Khusus (Sel/Kam): ${r.khusus.totalHadir} hadir / ${r.khusus.jumlahSesi} sesi (Rp${r.khusus.diterima.toLocaleString('id-ID')})`
+    `💰 *Kas Masuk (Lunas): Rp${r.total.diterima.toLocaleString('id-ID')}*`,
+    `⏳ Iuran Belum Lunas: Rp${r.total.piutang.toLocaleString('id-ID')}`,
+    '────────────────────────',
+    '*Rincian Per Kategori:*',
+    `• Latihan Reguler (Sabtu): ${r.umum.totalHadir} hadir (${r.umum.jumlahSesi} sesi) — Rp${r.umum.diterima.toLocaleString('id-ID')}`,
+    `• Latihan Khusus TC (Sel/Kam): ${r.khusus.totalHadir} hadir (${r.khusus.jumlahSesi} sesi) — Rp${r.khusus.diterima.toLocaleString('id-ID')}`
   ];
 
   if (sesiLines) {
-    lines.push('', '*Rincian Per Sesi:*', sesiLines);
+    lines.push('', '*Rincian Sesi Latihan:*', sesiLines);
   }
-  lines.push('', `Dilaporkan oleh: Pelatih ${currentUser.nama || 'Putra Setia'}`);
+  lines.push('', `Dilaporkan oleh: Pelatih *${currentUser.nama || 'Putra Setia'}*`, 'Semoga berkah untuk kemajuan persilatan kita bersama. Aamiin.');
 
   const originalHtml = btnCopyReportWA.innerHTML;
   try {
@@ -1645,17 +1830,24 @@ function buildWaBillingUrl(debtor) {
   const phone = formatWaPhone(debtor.noHpWali);
   if (!phone) return '';
   const rincian = (debtor.sesiList || []).map(item =>
-    `• ${item.idSesi} (${item.tanggal}): Rp${item.sisa.toLocaleString('id-ID')}`
+    `• ${formatNamaLatihan(item.jenis)} (${formatTanggalIndo(item.tanggal)}): Rp${item.sisa.toLocaleString('id-ID')}`
   ).join('\n');
 
   const msg = [
-    `Assalamu'alaikum Warahmatullahi Wabarakatuh, Ayah/Bunda *${debtor.nama}*.`,
+    `Assalamu'alaikum Warahmatullahi Wabarakatuh.`,
+    `Semoga Ayah/Bunda dari ananda *${debtor.nama}* selalu dalam keadaan sehat dan berkah.`,
     '',
-    `Kami menginformasikan rekap iuran kas latihan Silat Putra Setia Rawa Bebek yang belum terselesaikan sebanyak *${debtor.jumlahSesi} sesi* dengan total *Rp${debtor.totalTunggakan.toLocaleString('id-ID')}*:`,
+    `Mohon izin kami menginformasikan catatan iuran kas latihan Silat Putra Setia Rawa Bebek yang belum terselesaikan sebanyak *${debtor.jumlahSesi} sesi latihan* dengan total *Rp${debtor.totalTunggakan.toLocaleString('id-ID')}*:`,
     rincian,
     '',
-    'Pembayaran dapat diserahkan langsung saat latihan berikutnya. Terima kasih atas dukungannya.',
-    `Salam hangat, Pelatih ${currentUser.nama || 'Putra Setia'}`
+    'Iuran kas ini digunakan untuk pemeliharaan fasilitas dan operasional latihan ananda.',
+    'Pembayaran dapat diserahkan langsung secara tunai kepada pelatih pada jadwal latihan berikutnya.',
+    '',
+    'Terima kasih banyak atas perhatian dan dukungan Ayah/Bunda.',
+    `Wassalamu'alaikum Warahmatullahi Wabarakatuh.`,
+    '',
+    `Salam hormat,`,
+    `Pelatih ${currentUser.nama || 'Putra Setia Rawa Bebek'}`
   ].join('\n');
 
   return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
@@ -1677,13 +1869,13 @@ async function loadDebtors() {
 }
 
 function renderDebtorsList(data) {
-  debtorSummaryText.textContent = `${data.totalSiswa} Siswa Menunggak • Total Rp${data.totalTunggakan.toLocaleString('id-ID')}`;
+  debtorSummaryText.textContent = `${data.totalSiswa} Siswa Belum Lunas • Total Rp${data.totalTunggakan.toLocaleString('id-ID')}`;
 
   if (!data.debtors || data.debtors.length === 0) {
     debtorsList.innerHTML = `
       <div style="text-align: center; padding: 20px 12px; color: var(--success);">
         <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-bottom: 8px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        <p style="font-size: 0.9rem; font-weight: 700;">Alhamdulillah, tidak ada tunggakan pembayaran!</p>
+        <p style="font-size: 0.9rem; font-weight: 700;">Alhamdulillah, seluruh siswa sudah melunasi iuran kas latihan!</p>
       </div>
     `;
     return;
@@ -1718,7 +1910,7 @@ function renderDebtorsList(data) {
         </div>
         <div style="text-align: right; flex-shrink: 0;">
           <div style="font-weight: 700; color: var(--danger); margin-bottom: 6px;">Sisa Rp${item.sisa.toLocaleString('id-ID')}</div>
-          <button type="button" class="btn btn-success btn-sm" style="min-height: 44px; padding: 6px 12px; font-size: 0.78rem; width: auto;" aria-label="Tandai lunas sesi ${escapeHtml(item.idSesi)} untuk ${escapeHtml(d.nama)}">Tandai Lunas</button>
+          <button type="button" class="btn btn-success btn-sm" style="min-height: 44px; padding: 6px 12px; font-size: 0.78rem; width: auto;" aria-label="Tandai lunas iuran untuk ${escapeHtml(d.nama)}">Tandai Lunas (Rp${item.sisa.toLocaleString('id-ID')})</button>
         </div>
       `;
       row.querySelector('button').addEventListener('click', () => {
@@ -1735,7 +1927,7 @@ function renderDebtorsList(data) {
     btnBulkPay.type = 'button';
     btnBulkPay.className = 'btn-bulk-pay';
     btnBulkPay.setAttribute('aria-label', `Pelunasan semua tunggakan ${d.nama} sebesar Rp${d.totalTunggakan.toLocaleString('id-ID')}`);
-    btnBulkPay.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span>Pelunasan Semua (Rp${d.totalTunggakan.toLocaleString('id-ID')})</span>`;
+    btnBulkPay.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span>✓ Tandai Semua Lunas (Rp${d.totalTunggakan.toLocaleString('id-ID')})</span>`;
     btnBulkPay.addEventListener('click', () => payAllDebtorSessions(d, btnBulkPay));
     actionsBar.appendChild(btnBulkPay);
 
@@ -1747,7 +1939,7 @@ function renderDebtorsList(data) {
       waLink.rel = 'noopener noreferrer';
       waLink.className = 'btn-wa-reminder';
       waLink.setAttribute('aria-label', `Kirim tagihan WhatsApp ke wali ${d.nama}`);
-      waLink.innerHTML = `${waSvg}<span>Kirim WA Tagihan</span>`;
+      waLink.innerHTML = `${waSvg}<span>Hubungi via WhatsApp</span>`;
       actionsBar.appendChild(waLink);
     } else {
       const noWaNote = document.createElement('span');
@@ -1762,7 +1954,7 @@ function renderDebtorsList(data) {
 }
 
 async function payDebtorItem(idSesi, idSiswa, nama, sisa) {
-  if (confirm(`Tandai Lunas sesi ${idSesi} untuk ${nama} sebesar Rp${sisa.toLocaleString('id-ID')}?`)) {
+  if (confirm(`Tandai Lunas iuran untuk ${nama} sebesar Rp${sisa.toLocaleString('id-ID')}?`)) {
     await markQuickPaid(idSesi, idSiswa);
     loadDebtors();
   }
@@ -1772,7 +1964,7 @@ async function payAllDebtorSessions(debtor, btnEl) {
   const sesiList = debtor.sesiList || [];
   if (sesiList.length === 0) return;
 
-  if (!confirm(`Lunasi SEMUA (${debtor.jumlahSesi} sesi) untuk ${debtor.nama} sebesar total Rp${debtor.totalTunggakan.toLocaleString('id-ID')}?`)) {
+  if (!confirm(`Tandai lunas SEMUA iuran (${debtor.jumlahSesi} sesi) untuk ${debtor.nama} sebesar total Rp${debtor.totalTunggakan.toLocaleString('id-ID')}?`)) {
     return;
   }
 
@@ -1869,19 +2061,19 @@ function renderSessionsManage() {
     item.innerHTML = `
       <div class="session-manage-header">
         <div>
-          <strong style="color: var(--primary); font-size: 0.95rem;">${s.idSesi}</strong>
-          <span style="font-size: 0.75rem; color: var(--text-muted);">(${s.jenis})</span>
+          <strong style="color: var(--primary); font-size: 0.95rem;">${formatNamaLatihan(s.jenis)}</strong>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">${s.idSesi}</div>
         </div>
         <span class="${statusClass}" style="font-size: 0.75rem; padding: 3px 8px;">${s.statusSesi}</span>
       </div>
       <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">
-        <div>Tgl Rencana: ${s.tglRencana || '-'}</div>
-        <div>Tgl Aktual: <strong>${s.tglAktual || '(Sesuai rencana)'}</strong></div>
+        <div>Rencana: <strong>${formatTanggalIndo(s.tglRencana)}</strong></div>
+        <div>Aktual: ${s.tglAktual ? `<strong>${formatTanggalIndo(s.tglAktual)}</strong>` : '(Sesuai rencana)'}</div>
         ${s.keterangan ? `<div style="color: var(--text); margin-top: 2px;">Ket: ${s.keterangan}</div>` : ''}
       </div>
       <button class="btn btn-secondary btn-sm" style="width: 100%; font-size: 0.85rem;">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-        <span>Edit Sesi (Geser / Status)</span>
+        <span>✏️ Ubah Jadwal / Status Latihan</span>
       </button>
     `;
     item.querySelector('button').addEventListener('click', () => {
@@ -1893,7 +2085,7 @@ function renderSessionsManage() {
 
 function openSessionEditModal(s) {
   editSessionId.value = s.idSesi;
-  modalSessionTitle.textContent = `Edit Sesi: ${s.idSesi}`;
+  modalSessionTitle.textContent = `Ubah Jadwal Latihan: ${formatNamaLatihan(s.jenis)}`;
   editSessionStatus.value = s.statusSesi || 'Terjadwal';
   editSessionActualDate.value = s.tglAktual || s.tglRencana || '';
   editSessionKeterangan.value = s.keterangan || '';
@@ -1934,10 +2126,10 @@ async function handleSaveSessionEdit() {
       renderSessionsManage();
       showFeedback('success', 'Sesi Diperbarui', `Sesi ${idSesi} berhasil diupdate.`);
     } else {
-      alert(res.message || 'Gagal menyimpan perubahan sesi.');
+      showScanToast('error', 'Gagal Simpan', res.message || 'Gagal menyimpan perubahan jadwal latihan.');
     }
   } catch (err) {
-    alert('Koneksi gagal saat update sesi.');
+    showScanToast('error', 'Koneksi Terputus', 'Koneksi internet bermasalah saat memperbarui jadwal.');
   } finally {
     btnSaveSessionEdit.disabled = false;
     btnSaveSessionEdit.textContent = 'Simpan Perubahan';
@@ -1985,7 +2177,7 @@ async function handleSaveNewSession() {
   const keterangan = newSessionKeterangan.value.trim();
 
   if (!tanggal) {
-    alert('Tanggal sesi wajib dipilih.');
+    showScanToast('warning', 'Tanggal Diperlukan', 'Tanggal jadwal latihan wajib dipilih.');
     return;
   }
 
@@ -2025,10 +2217,10 @@ async function handleSaveNewSession() {
       closeCreateSessionModal();
       showFeedback('success', 'Sesi Baru Dibuat', `Sesi ${newSesi.idSesi} (${newSesi.jenis}) berhasil ditambahkan ke jadwal.`);
     } else {
-      alert(res.message || 'Gagal membuat sesi baru.');
+      showScanToast('error', 'Gagal Buat Jadwal', res.message || 'Gagal membuat jadwal latihan baru.');
     }
   } catch (err) {
-    alert('Koneksi gagal saat membuat sesi.');
+    showScanToast('error', 'Koneksi Terputus', 'Koneksi internet bermasalah saat membuat jadwal baru.');
   } finally {
     btnSaveNewSession.disabled = false;
     btnSaveNewSession.textContent = 'Simpan Sesi';
