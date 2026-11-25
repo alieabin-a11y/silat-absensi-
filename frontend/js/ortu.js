@@ -197,11 +197,11 @@ function renderParentPortal(data) {
     if (item.statusHadir === 'Hadir') {
       hadirBadge = '<span class="badge-paid" style="font-size: 0.75rem;">Hadir ✓</span>';
     } else if (item.statusHadir === 'Izin') {
-      hadirBadge = '<span class="badge-izin" style="font-size: 0.75rem; padding: 3px 8px; border-radius: 20px; font-weight: 700;">Izin 📝</span>';
+      hadirBadge = '<span class="badge-izin" style="font-size: 0.75rem; padding: 3px 8px; border-radius: 20px; font-weight: 700;">Izin</span>';
     } else if (item.statusHadir === 'Sakit') {
-      hadirBadge = '<span class="badge-sakit" style="font-size: 0.75rem; padding: 3px 8px; border-radius: 20px; font-weight: 700;">Sakit 🤒</span>';
+      hadirBadge = '<span class="badge-sakit" style="font-size: 0.75rem; padding: 3px 8px; border-radius: 20px; font-weight: 700;">Sakit</span>';
     } else {
-      hadirBadge = '<span class="badge-absent" style="font-size: 0.75rem; padding: 3px 8px; border-radius: 20px; font-weight: 600;">Tidak Hadir ✕</span>';
+      hadirBadge = '<span class="badge-absent" style="font-size: 0.75rem; padding: 3px 8px; border-radius: 20px; font-weight: 600;">Tidak Hadir</span>';
     }
 
     let bayarBadge = '';

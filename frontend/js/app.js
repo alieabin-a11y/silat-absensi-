@@ -28,6 +28,8 @@ let isScannerPaused = false;
 let isProcessingScan = false;
 let lastScanned = { id: '', time: 0 };
 let sessionAttendanceList = []; // Daftar yang sudah discan di sesi aktif
+let isFastScanMode = localStorage.getItem('fast_scan_mode') !== 'false'; // Default TRUE
+let isTorchOn = false;
 
 // ─────────────────────────────────────────────
 // Audio & Vibration Feedback
@@ -98,6 +100,31 @@ function vibrate(pattern = [150]) {
   }
 }
 
+function showScanToast(type, title, desc, duration = 1800) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = `scan-toast ${type}`;
+  const iconSvg = type === 'success' 
+    ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>'
+    : (type === 'duplicate' 
+       ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>'
+       : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>');
+  
+  toast.innerHTML = `
+    <div class="scan-toast-icon">${iconSvg}</div>
+    <div class="scan-toast-body">
+      <div class="scan-toast-title">${title}</div>
+      <div class="scan-toast-desc">${desc}</div>
+    </div>
+  `;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.animation = 'toastOut 0.3s forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
 // ─────────────────────────────────────────────
 // API Call Helper
 // ─────────────────────────────────────────────
@@ -143,6 +170,10 @@ const sessionSelectContainer = document.getElementById('sessionSelectContainer')
 const selectSession = document.getElementById('selectSession');
 
 const btnToggleCamera = document.getElementById('btnToggleCamera');
+const btnFastScanToggle = document.getElementById('btnFastScanToggle');
+const fastScanLabel = document.getElementById('fastScanLabel');
+const btnFlashlight = document.getElementById('btnFlashlight');
+
 const feedbackCard = document.getElementById('feedbackCard');
 const feedbackTitle = document.getElementById('feedbackTitle');
 const feedbackDesc = document.getElementById('feedbackDesc');
@@ -155,7 +186,7 @@ const attendanceCount = document.getElementById('attendanceCount');
 const attendanceList = document.getElementById('attendanceList');
 
 const scanModal = document.getElementById('scanModal');
-const modalIcon = document.getElementById('modalIcon');
+const modalIconContainer = document.getElementById('modalIconContainer');
 const modalTitle = document.getElementById('modalTitle');
 const modalStudentName = document.getElementById('modalStudentName');
 const modalStudentMeta = document.getElementById('modalStudentMeta');
@@ -239,7 +270,53 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnCancelNewSession) btnCancelNewSession.addEventListener('click', closeCreateSessionModal);
   if (btnSaveNewSession) btnSaveNewSession.addEventListener('click', handleSaveNewSession);
   if (newSessionJenis) newSessionJenis.addEventListener('change', handleNewSessionJenisChange);
+
+  // Fast Scan & Flashlight
+  if (btnFastScanToggle) {
+    updateFastScanUI();
+    btnFastScanToggle.addEventListener('click', toggleFastScanMode);
+  }
+  if (btnFlashlight) {
+    btnFlashlight.addEventListener('click', toggleFlashlight);
+  }
 });
+
+function toggleFastScanMode() {
+  isFastScanMode = !isFastScanMode;
+  localStorage.setItem('fast_scan_mode', isFastScanMode ? 'true' : 'false');
+  updateFastScanUI();
+}
+
+function updateFastScanUI() {
+  if (!btnFastScanToggle) return;
+  btnFastScanToggle.classList.toggle('active', isFastScanMode);
+  if (fastScanLabel) {
+    fastScanLabel.textContent = isFastScanMode ? 'Mode Cepat' : 'Mode Detail';
+  }
+}
+
+async function toggleFlashlight() {
+  if (!html5QrCode || !isScannerRunning) return;
+  try {
+    isTorchOn = !isTorchOn;
+    await html5QrCode.applyVideoConstraints({
+      advanced: [{ torch: isTorchOn }]
+    });
+    if (btnFlashlight) {
+      btnFlashlight.classList.toggle('active', isTorchOn);
+      btnFlashlight.style.backgroundColor = isTorchOn ? 'var(--accent)' : '';
+      btnFlashlight.style.color = isTorchOn ? '#212529' : '';
+    }
+  } catch (err) {
+    console.warn('Senter tidak didukung pada kamera/browser ini:', err);
+    isTorchOn = false;
+    if (btnFlashlight) {
+      btnFlashlight.classList.remove('active');
+      btnFlashlight.style.backgroundColor = '';
+      btnFlashlight.style.color = '';
+    }
+  }
+}
 
 // ─────────────────────────────────────────────
 // Auth / Login
@@ -541,8 +618,23 @@ function resumeScanner() {
   }
 }
 
-function openScanModal(icon, title, studentName, studentMeta, statusHtml, actions = []) {
-  modalIcon.textContent = icon;
+function openScanModal(iconType, title, studentName, studentMeta, statusHtml, actions = []) {
+  if (modalIconContainer) {
+    if (iconType === 'success' || iconType === '✅') {
+      modalIconContainer.innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+      modalIconContainer.style.background = 'var(--success-bg)';
+      modalIconContainer.style.color = 'var(--success)';
+    } else if (iconType === 'warning' || iconType === '⚠️') {
+      modalIconContainer.innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+      modalIconContainer.style.background = 'var(--warning-bg)';
+      modalIconContainer.style.color = 'var(--warning)';
+    } else {
+      modalIconContainer.innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+      modalIconContainer.style.background = 'var(--danger-bg)';
+      modalIconContainer.style.color = 'var(--danger)';
+    }
+  }
+
   modalTitle.textContent = title;
   modalStudentName.textContent = studentName;
   modalStudentMeta.textContent = studentMeta;
@@ -657,21 +749,30 @@ function handleScanResult(res, idSiswa) {
     const tarifText = record.tarif ? `Rp${Number(record.tarif).toLocaleString('id-ID')}` : 'Rp15.000';
 
     playChime('success');
-    vibrate([150]);
+    vibrate([80]);
 
     // Tambahkan ke riwayat tampilan
     addAttendanceRecord(record);
 
-    // Tampilkan Pop-up Pembayaran & Jeda Kamera
+    // Jika Mode Cepat aktif, tampilkan toast dan auto-resume tanpa modal
+    if (isFastScanMode) {
+      showScanToast('success', `${displayName} Hadir!`, `ID: ${record.idSiswa} • Jam: ${record.timestamp}`);
+      setTimeout(() => {
+        resumeScanner();
+      }, 1000);
+      return;
+    }
+
+    // Tampilkan Pop-up Pembayaran & Jeda Kamera (Mode Detail)
     openScanModal(
-      '✅',
+      'success',
       'Kehadiran Tercatat!',
       displayName,
       `ID: ${record.idSiswa} • Jam: ${record.timestamp}`,
       `<span class="badge-unpaid">Status: Belum Lunas</span>`,
       [
         {
-          text: `💰 Bayar Lunas (Tunai ${tarifText})`,
+          text: `Bayar Lunas (Tunai ${tarifText})`,
           class: 'btn-success',
           onClick: async () => {
             await markQuickPaid(record.idSesi, record.idSiswa);
@@ -679,7 +780,7 @@ function handleScanResult(res, idSiswa) {
           }
         },
         {
-          text: '📋 Belum Bayar (Lanjut Scan)',
+          text: 'Belum Bayar (Lanjut Scan)',
           class: 'btn-secondary',
           onClick: () => {
             resumeScanner();
@@ -700,10 +801,19 @@ function handleScanResult(res, idSiswa) {
     const studentName = existing ? existing.nama : (res.data.nama || idSiswa);
     const jamHadir = res.data.timestamp || (existing ? existing.timestamp : '-');
 
+    // Jika Mode Cepat aktif, tampilkan toast peringatan dan auto-resume
+    if (isFastScanMode) {
+      showScanToast('duplicate', `${studentName} (Sudah Hadir)`, `Discan jam: ${jamHadir} • ${isPaid ? 'Lunas ✓' : 'Belum Lunas'}`);
+      setTimeout(() => {
+        resumeScanner();
+      }, 1200);
+      return;
+    }
+
     const actions = [];
     if (!isPaid) {
       actions.push({
-        text: '💰 Tandai Lunas Sekarang',
+        text: 'Tandai Lunas Sekarang',
         class: 'btn-success',
         onClick: async () => {
           await markQuickPaid(appData.sesiAktif.idSesi, idSiswa);
@@ -720,7 +830,7 @@ function handleScanResult(res, idSiswa) {
     });
 
     openScanModal(
-      '⚠️',
+      'warning',
       'Sudah Hadir (Duplikat)',
       studentName,
       `Siswa sudah discan pada jam: ${jamHadir}`,
@@ -962,7 +1072,7 @@ function renderAttendanceList() {
     el.className = 'attendance-item';
     const isPaid = item.statusBayar === 'Lunas';
     // Badge status hadir (Hadir/Izin/Sakit)
-    const statusHadirLabel = item.statusHadir === 'Izin' ? ' 📝' : item.statusHadir === 'Sakit' ? ' 🤒' : '';
+    const statusHadirLabel = item.statusHadir === 'Izin' ? ' <span style="font-size:0.75rem; color:#1565c0; font-weight:700;">(Izin)</span>' : item.statusHadir === 'Sakit' ? ' <span style="font-size:0.75rem; color:#e65100; font-weight:700;">(Sakit)</span>' : '';
     el.innerHTML = `
       <div style="flex: 1; min-width: 0;">
         <div class="attendance-name">${item.nama} (${item.idSiswa})${statusHadirLabel}</div>
@@ -972,7 +1082,9 @@ function renderAttendanceList() {
         <button class="badge-${isPaid ? 'paid' : 'unpaid'}" style="cursor: pointer; border: none; font-family: inherit;" title="Klik untuk ubah status bayar">
           ${item.statusBayar || 'Belum'} ${isPaid ? '✓' : '✎'}
         </button>
-        <button class="btn btn-secondary btn-sm" style="width: auto; padding: 4px 8px; font-size: 0.75rem;" title="Hapus kehadiran">🗑️</button>
+        <button class="btn btn-secondary btn-icon" style="width: 38px; height: 38px; min-height: 38px; padding: 0;" title="Hapus kehadiran">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
       </div>
     `;
     // Tombol bayar
@@ -997,14 +1109,14 @@ function showAttendanceOptions(siswa) {
     return;
   }
   openScanModal(
-    '📋',
+    'warning',
     'Catat Kehadiran Manual',
     `${siswa.nama} ${siswa.panggilan ? '(' + siswa.panggilan + ')' : ''}`,
     `ID: ${siswa.idSiswa} • Pilih status kehadiran`,
     `<span class="badge-unpaid">Pilih Status</span>`,
     [
       {
-        text: '✅ Hadir (Scan)',
+        text: 'Hadir (Siswa Hadir)',
         class: 'btn-primary',
         onClick: () => {
           closeScanModal();
@@ -1013,7 +1125,7 @@ function showAttendanceOptions(siswa) {
         }
       },
       {
-        text: '📝 Izin',
+        text: 'Izin (Ada Keperluan)',
         class: 'btn-secondary',
         onClick: async () => {
           closeScanModal();
@@ -1021,7 +1133,7 @@ function showAttendanceOptions(siswa) {
         }
       },
       {
-        text: '🤒 Sakit',
+        text: 'Sakit (Tidak Enak Badan)',
         class: 'btn-secondary',
         onClick: async () => {
           closeScanModal();
