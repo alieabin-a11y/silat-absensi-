@@ -1,5 +1,5 @@
 // Service Worker - Absensi Silat Putra Setia
-const CACHE_NAME = 'silat-ps-v3';
+const CACHE_NAME = 'silat-ps-v4';
 const STATIC_ASSETS = [
   './',
   './index.html',

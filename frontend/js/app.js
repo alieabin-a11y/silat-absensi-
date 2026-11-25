@@ -200,6 +200,7 @@ const modalActions = document.getElementById('modalActions');
 const btnCloseSession = document.getElementById('btnCloseSession');
 
 // M4: Tab & Roster & Pendapatan & Tunggakan & Sesi
+const bottomNav = document.getElementById('bottomNav');
 const navTabs = document.querySelectorAll('.bottom-nav-item');
 const tabPanes = document.querySelectorAll('.tab-pane');
 const rosterFilterBtns = document.querySelectorAll('.roster-segment-btn');
@@ -265,8 +266,20 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnCloseSession) btnCloseSession.addEventListener('click', handleCloseSession);
 
   // M4 Event Listeners
+  if (bottomNav) {
+    bottomNav.addEventListener('click', (e) => {
+      const btn = e.target.closest('.bottom-nav-item');
+      if (btn && btn.dataset.tab) {
+        e.preventDefault();
+        switchTab(btn.dataset.tab);
+      }
+    });
+  }
   navTabs.forEach(tab => {
-    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    tab.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchTab(tab.dataset.tab);
+    });
   });
   rosterFilterBtns.forEach(btn => {
     btn.addEventListener('click', () => setRosterFilter(btn.dataset.rosterFilter));
@@ -339,6 +352,7 @@ function showLogin() {
   loginSection.classList.remove('hidden');
   dashboardSection.classList.add('hidden');
   coachProfileHeader.classList.add('hidden');
+  if (bottomNav) bottomNav.classList.add('hidden');
   stopCamera();
 }
 
@@ -394,6 +408,7 @@ async function initDashboard() {
   loginSection.classList.add('hidden');
   dashboardSection.classList.remove('hidden');
   coachProfileHeader.classList.remove('hidden');
+  if (bottomNav) bottomNav.classList.remove('hidden');
   coachDisplayName.textContent = currentUser.nama;
 
   sessionTitle.textContent = 'Memuat data sesi...';
@@ -1444,12 +1459,18 @@ async function handleCloseSession() {
 // ─────────────────────────────────────────────
 
 function switchTab(tabId) {
-  navTabs.forEach(btn => {
+  if (!tabId) return;
+
+  const currentNavTabs = document.querySelectorAll('.bottom-nav-item');
+  currentNavTabs.forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabId);
   });
-  tabPanes.forEach(pane => {
+  const currentPanes = document.querySelectorAll('.tab-pane');
+  currentPanes.forEach(pane => {
     pane.classList.toggle('hidden', pane.id !== tabId);
   });
+
+  window.scrollTo({ top: 0, behavior: 'instant' });
 
   if (tabId === 'panePresensi') {
     resumeScanner();
@@ -1458,7 +1479,7 @@ function switchTab(tabId) {
   }
 
   if (tabId === 'panePendapatan') {
-    const bulan = inputMonthRevenue.value || (appData.today ? appData.today.substring(0, 7) : '');
+    const bulan = (inputMonthRevenue && inputMonthRevenue.value) || (appData.today ? appData.today.substring(0, 7) : new Date().toISOString().substring(0, 7));
     loadRevenueMonth(bulan);
   } else if (tabId === 'paneTunggakan') {
     loadDebtors();

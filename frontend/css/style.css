@@ -571,7 +571,7 @@ label {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
   padding: 16px;
   backdrop-filter: blur(3px);
 }
@@ -661,8 +661,10 @@ label {
 .bottom-nav {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
   min-height: 64px;
   height: calc(64px + env(safe-area-inset-bottom, 0px));
   background: #ffffff;
@@ -670,10 +672,13 @@ label {
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  z-index: 999;
-  max-width: 480px;
-  margin: 0 auto;
+  z-index: 9999;
   padding: 0 4px env(safe-area-inset-bottom, 0px);
+  touch-action: manipulation;
+}
+
+.bottom-nav.hidden {
+  display: none !important;
 }
 
 .bottom-nav-item {
@@ -693,6 +698,13 @@ label {
   gap: 3px;
   min-height: 48px;
   text-decoration: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  pointer-events: auto;
+}
+
+.bottom-nav-item * {
+  pointer-events: none;
 }
 
 .bottom-nav-item svg {
