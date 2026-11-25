@@ -79,6 +79,88 @@ function markPaid(body, namaPelatih) {
   }
 }
 
+/**
+ * Aksi: bulkMarkPaid
+ * Params: { idSiswa, sesiList?, metode? }
+ *
+ * Melunasi semua tunggakan (atau daftar idSesi spesifik) milik seorang siswa sekaligus dalam 1 lock atomik.
+ */
+function bulkMarkPaid(body, namaPelatih) {
+  var idSiswa = body.idSiswa;
+  if (!idSiswa || typeof idSiswa !== 'string') {
+    return jsonResponse(false, 'invalid_input', 'ID Siswa wajib diisi.', null);
+  }
+  idSiswa = idSiswa.trim();
+
+  var targetSesiList = Array.isArray(body.sesiList) ? body.sesiList : null;
+  var metode = body.metode || 'Tunai';
+
+  var lock = LockService.getScriptLock();
+  var hasLock = false;
+
+  try {
+    hasLock = lock.tryLock(15000);
+    if (!hasLock) {
+      return jsonResponse(false, 'server_busy', 'Server sibuk, coba beberapa saat lagi.', null);
+    }
+
+    var sheet = getSpreadsheet().getSheetByName(SHEET_ABSENSI);
+    var lastRow = getLastDataRow(sheet, 'A');
+    if (lastRow === 0) {
+      return jsonResponse(true, 'ok', 'Tidak ada data absensi untuk dilunasi.', { updatedCount: 0, updatedSessions: [] });
+    }
+
+    // Baca kolom B..I (idSesi, idSiswa, nama, jenis, statusHadir, tarif, statusBayar, jumlahDibayar)
+    var data = sheet.getRange(2, 2, lastRow, 8).getValues();
+    var tglBayar = todayWIB();
+    var updatedSessions = [];
+
+    for (var i = 0; i < data.length; i++) {
+      var rowIdSesi = String(data[i][0]).trim();
+      var rowIdSiswa = String(data[i][1]).trim();
+      var rowStatusHadir = String(data[i][4]).trim();
+      var rowTarif = Number(data[i][5]) || 0;
+      var rowStatusBayar = String(data[i][6]).trim();
+      var rowDibayar = Number(data[i][7]) || 0;
+
+      if (rowIdSiswa !== idSiswa) continue;
+      if (targetSesiList && targetSesiList.indexOf(rowIdSesi) === -1) continue;
+
+      if (rowStatusHadir === 'Hadir' && rowStatusBayar !== 'Lunas' && rowTarif > rowDibayar) {
+        var rowIndex = i + 2;
+        updateAbsensiRow(rowIndex, {
+          statusBayar:   'Lunas',
+          jumlahDibayar: rowTarif,
+          metode:        metode,
+          tglBayar:      tglBayar
+        });
+        updatedSessions.push({
+          idSesi:        rowIdSesi,
+          statusBayar:   'Lunas',
+          jumlahDibayar: rowTarif,
+          metode:        metode,
+          tglBayar:      tglBayar
+        });
+      }
+    }
+
+    logInfo('bulkMarkPaid sukses oleh ' + namaPelatih + ': ' + idSiswa + ' (' + updatedSessions.length + ' sesi)');
+
+    return jsonResponse(true, 'ok', updatedSessions.length + ' sesi berhasil dilunasi.', {
+      idSiswa: idSiswa,
+      updatedCount: updatedSessions.length,
+      updatedSessions: updatedSessions
+    });
+  } catch (err) {
+    logError('bulkMarkPaid error: ' + err.message);
+    return jsonResponse(false, 'server_error', 'Gagal memproses pelunasan massal: ' + err.message, null);
+  } finally {
+    if (hasLock) {
+      lock.releaseLock();
+    }
+  }
+}
+
 // ─────────────────────────────────────────────
 // M4: revenueMonth — Ringkasan bulanan & per sesi
 // ─────────────────────────────────────────────

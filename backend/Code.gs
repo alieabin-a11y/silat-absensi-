@@ -44,8 +44,10 @@ function doPost(e) {
       case 'setAttendance':
       case 'deleteAttendance':
       case 'markPaid':
+      case 'bulkMarkPaid':
       case 'sessionAttendance':
       case 'updateSession':
+      case 'createSession':
       case 'createSessions':
       case 'revenueMonth':
       case 'debtors':
@@ -98,6 +100,7 @@ function handleCoachAction(action, body) {
     case 'setAttendance':   return setAttendance(body, tokenCheck.namaPelatih);
     case 'deleteAttendance':return deleteAttendance(body, tokenCheck.namaPelatih);
     case 'markPaid':        return markPaid(body, tokenCheck.namaPelatih);
+    case 'bulkMarkPaid':    return bulkMarkPaid(body, tokenCheck.namaPelatih);
     case 'sessionAttendance': return getSessionAttendance(body);
     case 'updateSession':   return updateSession(body, tokenCheck.namaPelatih);
     case 'createSession':

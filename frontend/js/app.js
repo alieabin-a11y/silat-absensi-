@@ -30,6 +30,9 @@ let lastScanned = { id: '', time: 0 };
 let sessionAttendanceList = []; // Daftar yang sudah discan di sesi aktif
 let isFastScanMode = localStorage.getItem('fast_scan_mode') !== 'false'; // Default TRUE
 let isTorchOn = false;
+let currentRosterFilter = 'hadir'; // 'hadir' | 'belum' | 'semua'
+let cachedRevenueData = null; // Cache data pendapatan bulanan untuk Salin WA
+let supportsBulkMarkPaid = null; // Deteksi endpoint bulkMarkPaid pada backend
 
 // ─────────────────────────────────────────────
 // Audio & Vibration Feedback
@@ -196,11 +199,17 @@ const modalActions = document.getElementById('modalActions');
 // M3: Tutup Sesi
 const btnCloseSession = document.getElementById('btnCloseSession');
 
-// M4: Tab & Pendapatan & Tunggakan & Sesi
-const navTabs = document.querySelectorAll('.nav-tab');
+// M4: Tab & Roster & Pendapatan & Tunggakan & Sesi
+const navTabs = document.querySelectorAll('.bottom-nav-item');
 const tabPanes = document.querySelectorAll('.tab-pane');
+const rosterFilterBtns = document.querySelectorAll('.roster-segment-btn');
+const rosterCountHadir = document.getElementById('rosterCountHadir');
+const rosterCountBelum = document.getElementById('rosterCountBelum');
+const rosterCountSemua = document.getElementById('rosterCountSemua');
+const rosterProgressFill = document.getElementById('rosterProgressFill');
 const inputMonthRevenue = document.getElementById('inputMonthRevenue');
 const btnRefreshRevenue = document.getElementById('btnRefreshRevenue');
+const btnCopyReportWA = document.getElementById('btnCopyReportWA');
 const revTotalHadir = document.getElementById('revTotalHadir');
 const revTotalSesi = document.getElementById('revTotalSesi');
 const revTotalDiterima = document.getElementById('revTotalDiterima');
@@ -259,9 +268,13 @@ document.addEventListener('DOMContentLoaded', () => {
   navTabs.forEach(tab => {
     tab.addEventListener('click', () => switchTab(tab.dataset.tab));
   });
+  rosterFilterBtns.forEach(btn => {
+    btn.addEventListener('click', () => setRosterFilter(btn.dataset.rosterFilter));
+  });
 
   if (btnRefreshRevenue) btnRefreshRevenue.addEventListener('click', () => loadRevenueMonth(inputMonthRevenue.value));
   if (inputMonthRevenue) inputMonthRevenue.addEventListener('change', () => loadRevenueMonth(inputMonthRevenue.value));
+  if (btnCopyReportWA) btnCopyReportWA.addEventListener('click', copyRevenueReportWA);
   if (btnRefreshDebtors) btnRefreshDebtors.addEventListener('click', () => loadDebtors());
   if (btnRefreshSessions) btnRefreshSessions.addEventListener('click', () => renderSessionsManage());
   if (btnSaveSessionEdit) btnSaveSessionEdit.addEventListener('click', handleSaveSessionEdit);
@@ -446,7 +459,15 @@ function renderSessionInfo() {
   sessionTitle.textContent = `Latihan Silat ${s.jenis} (${s.idSesi})`;
   const tgl = s.tglEfektif || s.tglRencana || '-';
   const isToday = tgl === appData.today;
-  sessionMeta.textContent = `Tanggal: ${tgl} ${isToday ? '• Hari ini (WIB)' : '• ⚠️ Bukan hari ini'}`;
+  sessionMeta.textContent = `Tanggal: ${tgl} ${isToday ? '• Hari ini (WIB)' : '• Bukan hari ini'}`;
+
+  if (btnCloseSession) {
+    const isClosed = s.statusSesi === 'Terlaksana';
+    btnCloseSession.disabled = isClosed;
+    btnCloseSession.innerHTML = isClosed
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>Sesi Sudah Terlaksana'
+      : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Tutup Sesi (Tandai Terlaksana)';
+  }
 
   // Ambil data absensi nyata dari Google Sheets untuk sesi ini
   loadSessionAttendance(s.idSesi);
@@ -491,7 +512,10 @@ function populateSessionDropdown() {
 function toggleSessionDropdown() {
   sessionSelectContainer.classList.toggle('hidden');
   const isHidden = sessionSelectContainer.classList.contains('hidden');
-  btnToggleSessionSelect.textContent = isHidden ? 'Pilih Sesi Lain ▼' : 'Tutup Pilihan ▲';
+  const chevronSvg = isHidden
+    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>'
+    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>';
+  btnToggleSessionSelect.innerHTML = `<span>${isHidden ? 'Pilih Sesi Lain' : 'Tutup Pilihan'}</span>${chevronSvg}`;
 }
 
 function handleSessionChange(e) {
@@ -683,7 +707,7 @@ async function processScan(idSiswa, confirm = false) {
   isProcessingScan = true;
 
   if (!appData.sesiAktif) {
-    openScanModal('⚠️', 'Sesi Belum Dipilih', '-', 'Silakan pilih sesi aktif terlebih dahulu sebelum scan.', '<span class="badge-unpaid">Sesi Kosong</span>', [
+    openScanModal('warning', 'Sesi Belum Dipilih', '-', 'Silakan pilih sesi aktif terlebih dahulu sebelum scan.', '<span class="badge-unpaid">Sesi Kosong</span>', [
       {
         text: 'Tutup & Lanjut',
         class: 'btn-secondary',
@@ -699,7 +723,7 @@ async function processScan(idSiswa, confirm = false) {
   // Validasi Regex ID Siswa
   const regex = /^S\d{3,}$/;
   if (!regex.test(idSiswa)) {
-    openScanModal('❌', 'QR Tidak Dikenali', `Format ID: ${idSiswa}`, 'Format QR tidak sesuai (contoh: S001).', '<span class="badge-unpaid">Bukan Kartu Siswa</span>', [
+    openScanModal('danger', 'QR Tidak Dikenali', `Format ID: ${idSiswa}`, 'Format QR tidak sesuai (contoh: S001).', '<span class="badge-unpaid">Bukan Kartu Siswa</span>', [
       {
         text: 'Tutup & Lanjut Scan',
         class: 'btn-secondary',
@@ -724,7 +748,7 @@ async function processScan(idSiswa, confirm = false) {
     handleScanResult(res, idSiswa);
 
   } catch (err) {
-    openScanModal('❌', 'Koneksi Error', `ID: ${idSiswa}`, 'Gagal menghubungi server. Periksa jaringan internet kamu.', '<span class="badge-unpaid">Koneksi Putus</span>', [
+    openScanModal('danger', 'Koneksi Error', `ID: ${idSiswa}`, 'Gagal menghubungi server. Periksa jaringan internet kamu.', '<span class="badge-unpaid">Koneksi Putus</span>', [
       {
         text: 'Tutup & Coba Lagi',
         class: 'btn-secondary',
@@ -846,7 +870,7 @@ function handleScanResult(res, idSiswa) {
     vibrate([100, 50, 100]);
 
     openScanModal(
-      '⚠️',
+      'warning',
       'Siswa Nonaktif',
       `${res.data.nama || idSiswa}`,
       'Siswa ini berstatus Nonaktif di database.',
@@ -876,7 +900,7 @@ function handleScanResult(res, idSiswa) {
     vibrate([100, 50, 100]);
 
     openScanModal(
-      '⚠️',
+      'warning',
       'Bukan Peserta Khusus',
       `${res.data.nama || idSiswa}`,
       'Siswa ini tidak terdaftar dalam daftar Turnamen Khusus.',
@@ -905,7 +929,7 @@ function handleScanResult(res, idSiswa) {
   vibrate([250]);
 
   openScanModal(
-    '❌',
+    'danger',
     'Scan Ditolak',
     `ID: ${idSiswa}`,
     res.message || 'Terjadi kesalahan saat memproses scan.',
@@ -960,8 +984,8 @@ async function markQuickPaid(idSesi, idSiswa, customJumlah = null) {
       playChime('success');
       vibrate([150]);
       
-      // Update item di daftar kehadiran lokal
-      const item = sessionAttendanceList.find(a => a.idSiswa === idSiswa);
+      // Update item di daftar kehadiran lokal (khusus sesi yang cocok)
+      const item = sessionAttendanceList.find(a => a.idSesi === idSesi && a.idSiswa === idSiswa);
       if (item) {
         item.statusBayar = res.data.statusBayar;
         item.jumlahDibayar = res.data.jumlahDibayar;
@@ -1017,10 +1041,10 @@ function handleManualSearch(e) {
     item.className = 'student-item';
     item.innerHTML = `
       <div>
-        <strong>${s.nama}</strong> ${s.panggilan ? `(${s.panggilan})` : ''}
-        <div style="font-size: 0.8rem; color: var(--text-muted);">${s.idSiswa} • ${s.status}</div>
+        <strong>${escapeHtml(s.nama)}</strong> ${s.panggilan ? `(${escapeHtml(s.panggilan)})` : ''}
+        <div style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(s.idSiswa)} • ${escapeHtml(s.status)}</div>
       </div>
-      <button class="btn btn-primary btn-sm" style="width: auto;">Hadir</button>
+      <button class="btn btn-primary btn-sm" style="width: auto;" aria-label="Tandai hadir ${escapeHtml(s.nama)}">Hadir</button>
     `;
     // Tombol Hadir: langsung proses scan
     item.querySelector('button').addEventListener('click', (e) => {
@@ -1044,8 +1068,27 @@ function handleManualSearch(e) {
 }
 
 // ─────────────────────────────────────────────
-// Riwayat Kehadiran Sesi
+// Riwayat Kehadiran Sesi & Filter Roster
 // ─────────────────────────────────────────────
+
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function setRosterFilter(filter) {
+  currentRosterFilter = filter || 'hadir';
+  rosterFilterBtns.forEach(btn => {
+    const isActive = btn.dataset.rosterFilter === currentRosterFilter;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+  renderAttendanceList();
+}
 
 function addAttendanceRecord(record) {
   // Cegah duplikasi di tampilan lokal
@@ -1058,44 +1101,173 @@ function addAttendanceRecord(record) {
   renderAttendanceList();
 }
 
-function renderAttendanceList() {
-  attendanceCount.textContent = `${sessionAttendanceList.length} Hadir`;
+function createAttendedRow(item) {
+  const el = document.createElement('div');
+  el.className = 'roster-item attended';
+  const isPaid = item.statusBayar === 'Lunas';
+  const statusHadirLabel = item.statusHadir === 'Izin'
+    ? ' <span style="font-size:0.75rem; color:#1565c0; font-weight:700;">(Izin)</span>'
+    : item.statusHadir === 'Sakit'
+      ? ' <span style="font-size:0.75rem; color:#e65100; font-weight:700;">(Sakit)</span>'
+      : '';
 
-  if (sessionAttendanceList.length === 0) {
-    attendanceList.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Belum ada siswa yang discan pada sesi ini.</p>';
+  const payIconSvg = isPaid
+    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>'
+    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>';
+
+  el.innerHTML = `
+    <div style="flex: 1; min-width: 0; padding-right: 8px;">
+      <div class="attendance-name">${escapeHtml(item.nama)} (${escapeHtml(item.idSiswa)})${statusHadirLabel}</div>
+      <div class="attendance-time">${escapeHtml(item.timestamp || '-')}</div>
+    </div>
+    <div class="roster-quick-actions">
+      <button type="button" class="badge-${isPaid ? 'paid' : 'unpaid'} btn-touch-badge" aria-label="Status pembayaran ${escapeHtml(item.nama)}: ${isPaid ? 'Lunas' : 'Belum Lunas'}. Ketuk untuk ubah">
+        <span>${escapeHtml(item.statusBayar || 'Belum')}</span>
+        ${payIconSvg}
+      </button>
+      <button type="button" class="btn btn-secondary btn-icon btn-touch-icon" aria-label="Hapus kehadiran ${escapeHtml(item.nama)}" title="Hapus kehadiran">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      </button>
+    </div>
+  `;
+
+  el.querySelector('.btn-touch-badge').addEventListener('click', () => {
+    promptMarkPaid(item.idSesi, item.idSiswa, item.nama, isPaid);
+  });
+  el.querySelector('.btn-touch-icon').addEventListener('click', () => {
+    promptDeleteAttendance(item.idSesi, item.idSiswa, item.nama);
+  });
+  return el;
+}
+
+function createUnattendedRow(student, isKhususSession, pesertaKhususSet) {
+  const el = document.createElement('div');
+  el.className = 'roster-item unattended';
+  const isKhususMember = isKhususSession && pesertaKhususSet.has(student.idSiswa);
+  const khususPill = isKhususMember
+    ? ' <span style="font-size:0.7rem; background:var(--accent-light); color:#7B5E00; border:1px solid var(--accent); padding:1px 6px; border-radius:8px; font-weight:700;">Khusus</span>'
+    : '';
+  const panggilanText = student.panggilan ? ` (${escapeHtml(student.panggilan)})` : '';
+
+  el.innerHTML = `
+    <div style="flex: 1; min-width: 0; padding-right: 8px;">
+      <div class="attendance-name">${escapeHtml(student.nama)}${panggilanText}${khususPill}</div>
+      <div class="attendance-time">${escapeHtml(student.idSiswa)} • ${escapeHtml(student.tingkatan || '-')}</div>
+    </div>
+    <div class="roster-quick-actions">
+      <button type="button" class="btn btn-primary btn-sm btn-quick-hadir" aria-label="Tandai hadir ${escapeHtml(student.nama)}">Hadir</button>
+      <button type="button" class="btn btn-secondary btn-sm btn-quick-izin" aria-label="Catat izin atau sakit ${escapeHtml(student.nama)}">Izin</button>
+    </div>
+  `;
+
+  const btnHadir = el.querySelector('.btn-quick-hadir');
+  btnHadir.addEventListener('click', () => quickMarkStudentPresent(student, btnHadir));
+
+  const btnIzin = el.querySelector('.btn-quick-izin');
+  btnIzin.addEventListener('click', () => showAttendanceOptions(student));
+
+  return el;
+}
+
+async function quickMarkStudentPresent(student, btnEl) {
+  if (!appData.sesiAktif) {
+    alert('Pilih sesi aktif terlebih dahulu.');
+    return;
+  }
+  if (isProcessingScan) return;
+
+  const originalText = btnEl.textContent;
+  btnEl.disabled = true;
+  btnEl.textContent = '...';
+  pauseScanner();
+
+  try {
+    await processScan(student.idSiswa);
+  } finally {
+    if (document.body.contains(btnEl)) {
+      btnEl.disabled = false;
+      btnEl.textContent = originalText;
+    }
+  }
+}
+
+function renderAttendanceList() {
+  const activeStudents = (appData.siswa || []).filter(s => (s.status || '').toLowerCase() === 'aktif');
+  const attendedMap = new Map(sessionAttendanceList.map(item => [item.idSiswa, item]));
+  const isKhususSession = Boolean(appData.sesiAktif && appData.sesiAktif.jenis === 'Khusus');
+  const pesertaKhususSet = new Set(appData.pesertaKhusus || []);
+
+  // Siswa aktif yang belum tercatat pada sesi ini
+  const belumList = activeStudents.filter(s => !attendedMap.has(s.idSiswa));
+  belumList.sort((a, b) => {
+    if (isKhususSession) {
+      const aKhusus = pesertaKhususSet.has(a.idSiswa) ? 0 : 1;
+      const bKhusus = pesertaKhususSet.has(b.idSiswa) ? 0 : 1;
+      if (aKhusus !== bKhusus) return aKhusus - bKhusus;
+    }
+    return (a.nama || '').localeCompare(b.nama || '', 'id');
+  });
+
+  // Gabungkan siswa aktif + siswa nonaktif yang tetap hadir (jika ada) untuk tab Semua
+  const allStudentsMap = new Map();
+  activeStudents.forEach(s => allStudentsMap.set(s.idSiswa, s));
+  sessionAttendanceList.forEach(a => {
+    if (!allStudentsMap.has(a.idSiswa)) {
+      allStudentsMap.set(a.idSiswa, { idSiswa: a.idSiswa, nama: a.nama, panggilan: '', tingkatan: '-' });
+    }
+  });
+  const semuaList = Array.from(allStudentsMap.values()).sort((a, b) => (a.nama || '').localeCompare(b.nama || '', 'id'));
+
+  const hadirCount = sessionAttendanceList.length;
+  const activeCount = activeStudents.length;
+  const pct = activeCount > 0 ? Math.min(100, Math.round((hadirCount / activeCount) * 100)) : 0;
+
+  if (attendanceCount) {
+    attendanceCount.textContent = activeCount > 0
+      ? `${hadirCount} dari ${activeCount} Hadir (${pct}%)`
+      : `${hadirCount} Hadir`;
+  }
+  if (rosterCountHadir) rosterCountHadir.textContent = hadirCount;
+  if (rosterCountBelum) rosterCountBelum.textContent = belumList.length;
+  if (rosterCountSemua) rosterCountSemua.textContent = semuaList.length;
+  if (rosterProgressFill) rosterProgressFill.style.width = `${pct}%`;
+
+  attendanceList.innerHTML = '';
+
+  if (currentRosterFilter === 'hadir') {
+    if (sessionAttendanceList.length === 0) {
+      attendanceList.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Belum ada siswa yang discan pada sesi ini.</p>';
+      return;
+    }
+    sessionAttendanceList.forEach(item => {
+      attendanceList.appendChild(createAttendedRow(item));
+    });
     return;
   }
 
-  attendanceList.innerHTML = '';
-  sessionAttendanceList.forEach(item => {
-    const el = document.createElement('div');
-    el.className = 'attendance-item';
-    const isPaid = item.statusBayar === 'Lunas';
-    // Badge status hadir (Hadir/Izin/Sakit)
-    const statusHadirLabel = item.statusHadir === 'Izin' ? ' <span style="font-size:0.75rem; color:#1565c0; font-weight:700;">(Izin)</span>' : item.statusHadir === 'Sakit' ? ' <span style="font-size:0.75rem; color:#e65100; font-weight:700;">(Sakit)</span>' : '';
-    el.innerHTML = `
-      <div style="flex: 1; min-width: 0;">
-        <div class="attendance-name">${item.nama} (${item.idSiswa})${statusHadirLabel}</div>
-        <div class="attendance-time">${item.timestamp || '-'}</div>
-      </div>
-      <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
-        <button class="badge-${isPaid ? 'paid' : 'unpaid'}" style="cursor: pointer; border: none; font-family: inherit;" title="Klik untuk ubah status bayar">
-          ${item.statusBayar || 'Belum'} ${isPaid ? '✓' : '✎'}
-        </button>
-        <button class="btn btn-secondary btn-icon" style="width: 38px; height: 38px; min-height: 38px; padding: 0;" title="Hapus kehadiran">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        </button>
-      </div>
-    `;
-    // Tombol bayar
-    el.querySelector('.badge-' + (isPaid ? 'paid' : 'unpaid')).addEventListener('click', () => {
-      promptMarkPaid(item.idSesi, item.idSiswa, item.nama, isPaid);
+  if (currentRosterFilter === 'belum') {
+    if (belumList.length === 0) {
+      attendanceList.innerHTML = '<p style="font-size: 0.85rem; color: var(--success); text-align: center; padding: 14px 0; font-weight: 700;">Semua siswa aktif sudah tercatat pada sesi ini.</p>';
+      return;
+    }
+    belumList.forEach(student => {
+      attendanceList.appendChild(createUnattendedRow(student, isKhususSession, pesertaKhususSet));
     });
-    // Tombol hapus
-    el.querySelector('button:last-child').addEventListener('click', () => {
-      promptDeleteAttendance(item.idSesi, item.idSiswa, item.nama);
-    });
-    attendanceList.appendChild(el);
+    return;
+  }
+
+  // Filter: 'semua'
+  if (semuaList.length === 0) {
+    attendanceList.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Data siswa belum tersedia.</p>';
+    return;
+  }
+  semuaList.forEach(student => {
+    const attendedRecord = attendedMap.get(student.idSiswa);
+    if (attendedRecord) {
+      attendanceList.appendChild(createAttendedRow(attendedRecord));
+    } else {
+      attendanceList.appendChild(createUnattendedRow(student, isKhususSession, pesertaKhususSet));
+    }
   });
 }
 
@@ -1178,14 +1350,14 @@ async function submitSetAttendance(idSiswa, statusHadir, namaDisplay) {
 
 function promptDeleteAttendance(idSesi, idSiswa, nama) {
   openScanModal(
-    '🗑️',
+    'danger',
     'Hapus Kehadiran?',
     nama,
     `ID: ${idSiswa} • Sesi: ${idSesi}`,
     `<span class="badge-unpaid">Konfirmasi Hapus</span>`,
     [
       {
-        text: '🗑️ Ya, Hapus',
+        text: 'Ya, Hapus',
         class: 'btn-danger',
         onClick: async () => {
           closeScanModal();
@@ -1233,8 +1405,9 @@ async function handleCloseSession() {
   if (!confirm(`Tutup sesi "${sesi.idSesi}" dan tandai sebagai Terlaksana?\n\nTotal hadir: ${sessionAttendanceList.length} siswa.`)) {
     return;
   }
+  const lockSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>';
   btnCloseSession.disabled = true;
-  btnCloseSession.textContent = '⏳ Menutup sesi...';
+  btnCloseSession.innerHTML = '<span class="spinner" style="border-color: rgba(123,19,23,0.25); border-top-color: var(--primary);"></span> Menutup sesi...';
   showFeedback('warning', 'Menutup Sesi...', `Memperbarui status sesi ${sesi.idSesi}...`);
   try {
     const res = await apiRequest('updateSession', {
@@ -1252,17 +1425,17 @@ async function handleCloseSession() {
         if (idx !== -1) appData.sesi[idx] = res.data.sesi;
         renderSessionInfo();
       }
-      showFeedback('success', 'Sesi Ditutup! ✓', `Sesi ${sesi.idSesi} sudah ditandai Terlaksana.`);
-      btnCloseSession.textContent = '✓ Sesi Sudah Ditutup';
+      showFeedback('success', 'Sesi Ditutup', `Sesi ${sesi.idSesi} sudah ditandai Terlaksana.`);
+      btnCloseSession.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 6px;"><polyline points="20 6 9 17 4 12"></polyline></svg>Sesi Sudah Terlaksana';
     } else {
       showFeedback('danger', 'Gagal Tutup Sesi', res.message || 'Gagal update status sesi.');
       btnCloseSession.disabled = false;
-      btnCloseSession.textContent = '🔒 Tutup Sesi (Tandai Terlaksana)';
+      btnCloseSession.innerHTML = `${lockSvg}Tutup Sesi (Tandai Terlaksana)`;
     }
   } catch (err) {
     showFeedback('danger', 'Koneksi Error', 'Gagal menghubungi server.');
     btnCloseSession.disabled = false;
-    btnCloseSession.textContent = '🔒 Tutup Sesi (Tandai Terlaksana)';
+    btnCloseSession.innerHTML = `${lockSvg}Tutup Sesi (Tandai Terlaksana)`;
   }
 }
 
@@ -1302,11 +1475,12 @@ async function loadRevenueMonth(month) {
   if (!month) {
     month = appData.today ? appData.today.substring(0, 7) : new Date().toISOString().substring(0, 7);
   }
+  cachedRevenueData = null;
   tableRevenuePerSesiBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 12px 0;">Memuat pendapatan...</td></tr>';
   try {
     const res = await apiRequest('revenueMonth', { bulan: month });
     if (res.ok && res.data) {
-      renderRevenueData(res.data);
+      renderRevenueData(res.data, month);
     } else {
       tableRevenuePerSesiBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--danger); padding: 12px 0;">${res.message || 'Gagal memuat data.'}</td></tr>`;
     }
@@ -1315,7 +1489,88 @@ async function loadRevenueMonth(month) {
   }
 }
 
-function renderRevenueData(data) {
+function formatBulanIndo(ym) {
+  const bulanNames = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+  const parts = String(ym || '').split('-');
+  if (parts.length !== 2) return ym || '-';
+  const idx = parseInt(parts[1], 10) - 1;
+  return `${bulanNames[idx] || parts[1]} ${parts[0]}`;
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand('copy');
+  document.body.removeChild(ta);
+  if (!ok) throw new Error('Copy fallback gagal');
+}
+
+async function copyRevenueReportWA() {
+  if (!cachedRevenueData || !cachedRevenueData.ringkasan) {
+    showScanToast('duplicate', 'Data Belum Siap', 'Tunggu data pendapatan selesai dimuat.');
+    return;
+  }
+
+  const r = cachedRevenueData.ringkasan;
+  const perSesi = cachedRevenueData.perSesi || [];
+  const bulanLabel = formatBulanIndo(cachedRevenueData.bulan);
+  const sesiLines = perSesi.map(s => {
+    const tglPendek = (s.tanggal || '').substring(5);
+    return `• ${s.idSesi} (${tglPendek}): ${s.jumlahHadir} hadir | Diterima Rp${s.diterima.toLocaleString('id-ID')}`;
+  }).join('\n');
+
+  const lines = [
+    '*REKAP KAS LATIHAN PUTRA SETIA RAWA BEBEK*',
+    `Bulan: ${bulanLabel}`,
+    `Total Kehadiran: ${r.total.totalHadir} Siswa`,
+    `Jumlah Sesi Terlaksana: ${r.total.jumlahSesi} Sesi`,
+    '',
+    `Kas Diterima: *Rp${r.total.diterima.toLocaleString('id-ID')}*`,
+    `Piutang Kas: Rp${r.total.piutang.toLocaleString('id-ID')}`,
+    '',
+    '*Rincian Jenis Latihan:*',
+    `- Latihan Umum (Sabtu): ${r.umum.totalHadir} hadir / ${r.umum.jumlahSesi} sesi (Rp${r.umum.diterima.toLocaleString('id-ID')})`,
+    `- Latihan Khusus (Sel/Kam): ${r.khusus.totalHadir} hadir / ${r.khusus.jumlahSesi} sesi (Rp${r.khusus.diterima.toLocaleString('id-ID')})`
+  ];
+
+  if (sesiLines) {
+    lines.push('', '*Rincian Per Sesi:*', sesiLines);
+  }
+  lines.push('', `Dilaporkan oleh: Pelatih ${currentUser.nama || 'Putra Setia'}`);
+
+  const originalHtml = btnCopyReportWA.innerHTML;
+  try {
+    await copyTextToClipboard(lines.join('\n'));
+    playChime('success');
+    vibrate([80]);
+    showScanToast('success', 'Rekap Disalin', 'Siap di-paste ke grup WhatsApp.');
+    btnCopyReportWA.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span>Tersalin ke Clipboard!</span>';
+    setTimeout(() => {
+      if (btnCopyReportWA) btnCopyReportWA.innerHTML = originalHtml;
+    }, 2400);
+  } catch (err) {
+    showScanToast('error', 'Gagal Menyalin', 'Browser tidak mengizinkan akses clipboard.');
+  }
+}
+
+function renderRevenueData(data, month) {
+  cachedRevenueData = {
+    bulan: month || (inputMonthRevenue ? inputMonthRevenue.value : ''),
+    ...data
+  };
+
   const r = data.ringkasan;
   revTotalHadir.textContent = `${r.total.totalHadir} Siswa`;
   revTotalSesi.textContent = `${r.total.jumlahSesi} Sesi`;
@@ -1337,11 +1592,11 @@ function renderRevenueData(data) {
   tableRevenuePerSesiBody.innerHTML = '';
   data.perSesi.forEach(s => {
     const tr = document.createElement('tr');
-    const badgeColor = s.jenis === 'Khusus' ? 'color: var(--accent);' : 'color: var(--primary);';
+    const badgeColor = s.jenis === 'Khusus' ? 'color: #8A6D0B;' : 'color: var(--primary);';
     const statusLabel = s.statusSesi === 'Terlaksana' ? '✓' : s.statusSesi === 'Batal' ? '✕' : '';
     tr.innerHTML = `
-      <td><strong style="${badgeColor}">[${s.jenis.substring(0,1)}]</strong> ${s.idSesi} <span style="font-size: 0.7rem; color: var(--text-muted);">${statusLabel}</span></td>
-      <td>${s.tanggal.substring(5)}</td>
+      <td><strong style="${badgeColor}">[${escapeHtml(s.jenis.substring(0, 1))}]</strong> ${escapeHtml(s.idSesi)} <span style="font-size: 0.7rem; color: var(--text-muted);">${statusLabel}</span></td>
+      <td>${escapeHtml((s.tanggal || '').substring(5))}</td>
       <td><strong>${s.jumlahHadir}</strong></td>
       <td class="text-success" style="font-weight: 600;">Rp${s.diterima.toLocaleString('id-ID')}</td>
       <td class="${s.piutang > 0 ? 'text-danger' : 'text-muted'}" style="font-weight: 600;">Rp${s.piutang.toLocaleString('id-ID')}</td>
@@ -1353,6 +1608,37 @@ function renderRevenueData(data) {
 // ─────────────────────────────────────────────
 // M4: Daftar Tunggakan Siswa
 // ─────────────────────────────────────────────
+
+function formatWaPhone(rawPhone) {
+  let digits = String(rawPhone || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('0')) {
+    digits = '62' + digits.slice(1);
+  } else if (digits.startsWith('8')) {
+    digits = '62' + digits;
+  }
+  return digits.length >= 10 ? digits : '';
+}
+
+function buildWaBillingUrl(debtor) {
+  const phone = formatWaPhone(debtor.noHpWali);
+  if (!phone) return '';
+  const rincian = (debtor.sesiList || []).map(item =>
+    `• ${item.idSesi} (${item.tanggal}): Rp${item.sisa.toLocaleString('id-ID')}`
+  ).join('\n');
+
+  const msg = [
+    `Assalamu'alaikum Warahmatullahi Wabarakatuh, Ayah/Bunda *${debtor.nama}*.`,
+    '',
+    `Kami menginformasikan rekap iuran kas latihan Silat Putra Setia Rawa Bebek yang belum terselesaikan sebanyak *${debtor.jumlahSesi} sesi* dengan total *Rp${debtor.totalTunggakan.toLocaleString('id-ID')}*:`,
+    rincian,
+    '',
+    'Pembayaran dapat diserahkan langsung saat latihan berikutnya. Terima kasih atas dukungannya.',
+    `Salam hangat, Pelatih ${currentUser.nama || 'Putra Setia'}`
+  ].join('\n');
+
+  return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+}
 
 async function loadDebtors() {
   debtorsList.innerHTML = '<p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 12px 0;">Memuat daftar penunggak...</p>';
@@ -1373,43 +1659,83 @@ function renderDebtorsList(data) {
   debtorSummaryText.textContent = `${data.totalSiswa} Siswa Menunggak • Total Rp${data.totalTunggakan.toLocaleString('id-ID')}`;
 
   if (!data.debtors || data.debtors.length === 0) {
-    debtorsList.innerHTML = '<p style="font-size: 0.85rem; color: var(--success); text-align: center; padding: 18px 0; font-weight: 600;">🎉 Alhamdulillah, tidak ada tunggakan pembayaran!</p>';
+    debtorsList.innerHTML = `
+      <div style="text-align: center; padding: 20px 12px; color: var(--success);">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-bottom: 8px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <p style="font-size: 0.9rem; font-weight: 700;">Alhamdulillah, tidak ada tunggakan pembayaran!</p>
+      </div>
+    `;
     return;
   }
+
+  const waSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.031 2c-5.516 0-9.969 4.453-9.969 9.969 0 1.766.469 3.484 1.344 5.016l-1.406 5.156 5.281-1.375c1.484.813 3.109 1.25 4.75 1.25 5.516 0 9.969-4.453 9.969-9.969s-4.453-10.047-9.969-10.047zm5.797 14.125c-.25.703-1.438 1.344-1.984 1.422-.516.078-1.156.109-1.875-.125-.453-.141-1.016-.344-1.719-.641-2.969-1.281-4.906-4.297-5.063-4.5-.141-.203-1.203-1.609-1.203-3.063s.766-2.172 1.031-2.469c.266-.297.578-.375.781-.375.188 0 .391 0 .563.016.188.016.438-.078.688.516.25.609.859 2.094.938 2.25.078.156.125.344.016.547-.109.203-.156.344-.313.531-.156.188-.328.406-.469.547-.156.156-.328.328-.141.641.188.313.844 1.391 1.797 2.25 1.234 1.094 2.281 1.438 2.594 1.594.313.156.5.125.688-.094.188-.219.813-.938 1.031-1.266.219-.328.422-.266.719-.156.297.109 1.875.891 2.203 1.047.328.156.547.234.625.359.078.125.078.734-.172 1.438z"/></svg>';
 
   debtorsList.innerHTML = '';
   data.debtors.forEach(d => {
     const card = document.createElement('div');
     card.className = 'debtor-card';
 
-    let sessionsHtml = '';
+    const header = document.createElement('div');
+    header.className = 'debtor-header';
+    header.innerHTML = `
+      <div>
+        <div class="debtor-name">${escapeHtml(d.nama)} ${d.panggilan ? '(' + escapeHtml(d.panggilan) + ')' : ''}</div>
+        <div class="debtor-meta">${escapeHtml(d.idSiswa)} ${d.tingkatan ? '• ' + escapeHtml(d.tingkatan) : ''} • ${d.jumlahSesi} Sesi Belum Lunas</div>
+      </div>
+      <div class="debtor-amount">Rp${d.totalTunggakan.toLocaleString('id-ID')}</div>
+    `;
+    card.appendChild(header);
+
+    const sessionsContainer = document.createElement('div');
     d.sesiList.forEach(item => {
-      sessionsHtml += `
-        <div class="debtor-session-item">
-          <div>
-            <strong>${item.idSesi}</strong> (${item.tanggal})
-            <div style="font-size: 0.75rem; color: var(--text-muted);">${item.jenis} • Tarif: Rp${item.tarif.toLocaleString('id-ID')} • Dibayar: Rp${item.jumlahDibayar.toLocaleString('id-ID')}</div>
-          </div>
-          <div style="text-align: right;">
-            <div style="font-weight: 700; color: var(--danger); margin-bottom: 4px;">Sisa Rp${item.sisa.toLocaleString('id-ID')}</div>
-            <button class="btn btn-success btn-sm" style="padding: 3px 8px; font-size: 0.72rem; width: auto;" onclick="payDebtorItem('${item.idSesi}', '${d.idSiswa}', '${d.nama}', ${item.sisa})">Tandai Lunas</button>
-          </div>
+      const row = document.createElement('div');
+      row.className = 'debtor-session-item';
+      row.innerHTML = `
+        <div style="padding-right: 8px;">
+          <strong>${escapeHtml(item.idSesi)}</strong> (${escapeHtml(item.tanggal)})
+          <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(item.jenis)} • Tarif: Rp${item.tarif.toLocaleString('id-ID')} • Dibayar: Rp${item.jumlahDibayar.toLocaleString('id-ID')}</div>
+        </div>
+        <div style="text-align: right; flex-shrink: 0;">
+          <div style="font-weight: 700; color: var(--danger); margin-bottom: 6px;">Sisa Rp${item.sisa.toLocaleString('id-ID')}</div>
+          <button type="button" class="btn btn-success btn-sm" style="min-height: 44px; padding: 6px 12px; font-size: 0.78rem; width: auto;" aria-label="Tandai lunas sesi ${escapeHtml(item.idSesi)} untuk ${escapeHtml(d.nama)}">Tandai Lunas</button>
         </div>
       `;
+      row.querySelector('button').addEventListener('click', () => {
+        payDebtorItem(item.idSesi, d.idSiswa, d.nama, item.sisa);
+      });
+      sessionsContainer.appendChild(row);
     });
+    card.appendChild(sessionsContainer);
 
-    card.innerHTML = `
-      <div class="debtor-header">
-        <div>
-          <div class="debtor-name">${d.nama} ${d.panggilan ? '(' + d.panggilan + ')' : ''}</div>
-          <div class="debtor-meta">${d.idSiswa} ${d.tingkatan ? '• ' + d.tingkatan : ''} • ${d.jumlahSesi} Sesi Belum Lunas</div>
-        </div>
-        <div class="debtor-amount">Rp${d.totalTunggakan.toLocaleString('id-ID')}</div>
-      </div>
-      <div>
-        ${sessionsHtml}
-      </div>
-    `;
+    const actionsBar = document.createElement('div');
+    actionsBar.className = 'debtor-card-actions';
+
+    const btnBulkPay = document.createElement('button');
+    btnBulkPay.type = 'button';
+    btnBulkPay.className = 'btn-bulk-pay';
+    btnBulkPay.setAttribute('aria-label', `Pelunasan semua tunggakan ${d.nama} sebesar Rp${d.totalTunggakan.toLocaleString('id-ID')}`);
+    btnBulkPay.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span>Pelunasan Semua (Rp${d.totalTunggakan.toLocaleString('id-ID')})</span>`;
+    btnBulkPay.addEventListener('click', () => payAllDebtorSessions(d, btnBulkPay));
+    actionsBar.appendChild(btnBulkPay);
+
+    const waUrl = buildWaBillingUrl(d);
+    if (waUrl) {
+      const waLink = document.createElement('a');
+      waLink.href = waUrl;
+      waLink.target = '_blank';
+      waLink.rel = 'noopener noreferrer';
+      waLink.className = 'btn-wa-reminder';
+      waLink.setAttribute('aria-label', `Kirim tagihan WhatsApp ke wali ${d.nama}`);
+      waLink.innerHTML = `${waSvg}<span>Kirim WA Tagihan</span>`;
+      actionsBar.appendChild(waLink);
+    } else {
+      const noWaNote = document.createElement('span');
+      noWaNote.style.cssText = 'display: inline-flex; align-items: center; justify-content: center; font-size: 0.78rem; color: var(--text-muted); min-height: 44px; background: #f1f3f5; border-radius: 6px; padding: 6px 10px;';
+      noWaNote.textContent = 'No. WA wali belum tercatat';
+      actionsBar.appendChild(noWaNote);
+    }
+
+    card.appendChild(actionsBar);
     debtorsList.appendChild(card);
   });
 }
@@ -1420,7 +1746,86 @@ async function payDebtorItem(idSesi, idSiswa, nama, sisa) {
     loadDebtors();
   }
 }
-window.payDebtorItem = payDebtorItem;
+
+async function payAllDebtorSessions(debtor, btnEl) {
+  const sesiList = debtor.sesiList || [];
+  if (sesiList.length === 0) return;
+
+  if (!confirm(`Lunasi SEMUA (${debtor.jumlahSesi} sesi) untuk ${debtor.nama} sebesar total Rp${debtor.totalTunggakan.toLocaleString('id-ID')}?`)) {
+    return;
+  }
+
+  const originalHtml = btnEl.innerHTML;
+  btnEl.disabled = true;
+  btnEl.textContent = 'Memproses pelunasan...';
+
+  let usedBulk = false;
+  let successCount = 0;
+
+  try {
+    if (supportsBulkMarkPaid !== false) {
+      try {
+        const bulkRes = await apiRequest('bulkMarkPaid', {
+          idSiswa: debtor.idSiswa,
+          sesiList: sesiList.map(s => s.idSesi),
+          metode: 'Tunai'
+        });
+        if (bulkRes.ok) {
+          supportsBulkMarkPaid = true;
+          usedBulk = true;
+          successCount = (bulkRes.data && bulkRes.data.updatedCount) || sesiList.length;
+        } else if (bulkRes.code === 'invalid_input') {
+          supportsBulkMarkPaid = false;
+        }
+      } catch (err) {
+        // Lanjutkan dengan fallback markPaid berurutan
+      }
+    }
+
+    if (!usedBulk) {
+      for (let i = 0; i < sesiList.length; i++) {
+        btnEl.textContent = `Melunasi ${i + 1}/${sesiList.length}...`;
+        const res = await apiRequest('markPaid', {
+          idSesi: sesiList[i].idSesi,
+          idSiswa: debtor.idSiswa,
+          metode: 'Tunai'
+        });
+        if (res.ok) {
+          successCount++;
+          const localItem = sessionAttendanceList.find(a => a.idSesi === sesiList[i].idSesi && a.idSiswa === debtor.idSiswa);
+          if (localItem) {
+            localItem.statusBayar = res.data.statusBayar;
+            localItem.jumlahDibayar = res.data.jumlahDibayar;
+            localItem.metode = res.data.metode;
+            localItem.tglBayar = res.data.tglBayar;
+          }
+        }
+      }
+    } else if (appData.sesiAktif) {
+      // Sinkronkan status lokal jika sesi aktif termasuk yang dilunasi
+      sesiList.forEach(s => {
+        const localItem = sessionAttendanceList.find(a => a.idSesi === s.idSesi && a.idSiswa === debtor.idSiswa);
+        if (localItem) localItem.statusBayar = 'Lunas';
+      });
+    }
+
+    if (successCount > 0) {
+      playChime('success');
+      vibrate([150, 80, 150]);
+      renderAttendanceList();
+      showScanToast('success', 'Pelunasan Berhasil', `${debtor.nama}: ${successCount} sesi dilunasi.`);
+      await loadDebtors();
+    } else {
+      showScanToast('error', 'Pelunasan Gagal', 'Gagal memperbarui pembayaran di server.');
+      btnEl.disabled = false;
+      btnEl.innerHTML = originalHtml;
+    }
+  } catch (err) {
+    showScanToast('error', 'Koneksi Error', 'Gagal menghubungi server.');
+    btnEl.disabled = false;
+    btnEl.innerHTML = originalHtml;
+  }
+}
 
 // ─────────────────────────────────────────────
 // M4: Kelola Sesi Latihan
@@ -1453,7 +1858,10 @@ function renderSessionsManage() {
         <div>Tgl Aktual: <strong>${s.tglAktual || '(Sesuai rencana)'}</strong></div>
         ${s.keterangan ? `<div style="color: var(--text); margin-top: 2px;">Ket: ${s.keterangan}</div>` : ''}
       </div>
-      <button class="btn btn-secondary btn-sm" style="width: 100%; font-size: 0.8rem; padding: 6px;">⚙️ Edit Sesi (Geser / Status)</button>
+      <button class="btn btn-secondary btn-sm" style="width: 100%; font-size: 0.85rem;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span>Edit Sesi (Geser / Status)</span>
+      </button>
     `;
     item.querySelector('button').addEventListener('click', () => {
       openSessionEditModal(s);
@@ -1526,7 +1934,7 @@ function openCreateSessionModal() {
   const dd = String(now.getDate()).padStart(2, '0');
   if (newSessionDate) newSessionDate.value = `${yyyy}-${mm}-${dd}`;
   if (newSessionJenis) newSessionJenis.value = 'Umum';
-  if (newSessionTarif) newSessionTarif.value = 5000;
+  if (newSessionTarif) newSessionTarif.value = (appData.tarif && appData.tarif.umum) || 15000;
   if (newSessionKeterangan) newSessionKeterangan.value = 'Latihan Rutin Umum';
   if (createSessionModal) createSessionModal.classList.remove('hidden');
 }
@@ -1538,13 +1946,13 @@ function closeCreateSessionModal() {
 function handleNewSessionJenisChange() {
   const jenis = newSessionJenis.value;
   if (jenis === 'Khusus') {
-    newSessionTarif.value = 10000;
+    newSessionTarif.value = (appData.tarif && appData.tarif.khusus) || 5000;
     newSessionKeterangan.value = 'Latihan Khusus';
   } else if (jenis === 'Ujian') {
-    newSessionTarif.value = 15000;
+    newSessionTarif.value = (appData.tarif && appData.tarif.umum) || 15000;
     newSessionKeterangan.value = 'Ujian Kenaikan Tingkat';
   } else {
-    newSessionTarif.value = 5000;
+    newSessionTarif.value = (appData.tarif && appData.tarif.umum) || 15000;
     newSessionKeterangan.value = 'Latihan Rutin Umum';
   }
 }
@@ -1564,7 +1972,7 @@ async function handleSaveNewSession() {
   btnSaveNewSession.textContent = 'Membuat Sesi...';
 
   try {
-    const res = await apiRequest('createSession', {
+    const res = await apiRequest('createSessions', {
       tanggal: tanggal,
       jenis: jenis,
       tarif: tarif,
@@ -1582,7 +1990,7 @@ async function handleSaveNewSession() {
       appData.sesi.sort((a, b) => (b.tglEfektif || b.tglRencana).localeCompare(a.tglEfektif || a.tglRencana));
 
       // Re-render dropdown sesi di Tab Presensi
-      renderSessionSelector();
+      populateSessionDropdown();
 
       // Jika belum ada sesi aktif, jadikan sesi baru ini sebagai sesi aktif
       if (!appData.sesiAktif) {
